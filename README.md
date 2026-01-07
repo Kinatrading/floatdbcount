@@ -12,7 +12,7 @@ This Chrome extension helps generate CSFloat DB search links and counts sticker 
 1. Open Chrome and go to `chrome://extensions`.
 2. Enable **Developer mode**.
 3. Click **Load unpacked** and select this repository folder.
-4. Make sure `stickers_clean.json` is present in the root of the repo.
+4. Make sure `stickers.clean.json` is present in the root of the repo (the extension also tries `stickers_clean.json` first as a fallback option).
 
 ## Usage
 1. Click the extension icon to open the UI in a new tab.
@@ -23,7 +23,7 @@ This Chrome extension helps generate CSFloat DB search links and counts sticker 
 6. Review results and the summary block at the bottom.
 
 ## Data file
-The extension expects a `stickers_clean.json` file in the repository root with entries like:
+The extension expects a stickers data file in the repository root. It will try to load `stickers_clean.json` first and then fall back to `stickers.clean.json` with entries like:
 ```json
 {
   "id": "sticker-19",
