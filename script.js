@@ -17,6 +17,7 @@ const rarityCheckboxes = Array.from(
 const selectedStickersList = document.getElementById("selected-stickers");
 const clearStickersButton = document.getElementById("clear-stickers");
 const runBtn = document.getElementById("run-btn");
+const stopBtn = document.getElementById("stop-btn");
 const generatedLink = document.getElementById("generated-link");
 const resultsList = document.getElementById("results-list");
 const summaryList = document.getElementById("summary-list");
@@ -464,9 +465,18 @@ runBtn.addEventListener("click", () => {
   generatedLink.href = "#";
   generatedLink.textContent = "—";
   runBtn.disabled = true;
+  stopBtn.disabled = false;
+  let stopRequested = false;
+  stopBtn.onclick = () => {
+    stopRequested = true;
+    stopBtn.disabled = true;
+  };
   const summaryItems = [];
   const runSequential = async () => {
     for (const sticker of selectedStickers) {
+      if (stopRequested) {
+        break;
+      }
       const urls = [1, 2, 3, 4, 5].map((count) => ({
         count,
         url: buildUrl(sticker.def_index, count)
@@ -482,12 +492,14 @@ runBtn.addEventListener("click", () => {
         urls.map((item) => ({ ...item, found: null, loading: true }))
       );
 
-      const response = await new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          { action: "runCounts", urls: urls.map((u) => u.url) },
-          resolve
-        );
-      });
+      const response = stopRequested
+        ? null
+        : await new Promise((resolve) => {
+            chrome.runtime.sendMessage(
+              { action: "runCounts", urls: urls.map((u) => u.url) },
+              resolve
+            );
+          });
 
       if (!response?.results) {
         renderStickerResults(
@@ -520,6 +532,7 @@ runBtn.addEventListener("click", () => {
 
   runSequential().finally(() => {
     runBtn.disabled = false;
+    stopBtn.disabled = true;
     renderSummary(summaryItems);
   });
 });

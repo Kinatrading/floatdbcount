@@ -114,6 +114,12 @@ input[type="text"] {
   align-items: flex-start;
 }
 
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 button {
   background: #1d4ed8;
   color: #fff;
