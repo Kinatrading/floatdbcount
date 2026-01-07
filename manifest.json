@@ -3,7 +3,8 @@
   "name": "CSFloat DB Sticker Linker",
   "version": "0.1.0",
   "description": "Generate CSFloat DB links by sticker and float range.",
-  "permissions": ["tabs"],
+  "permissions": ["tabs", "scripting"],
+  "host_permissions": ["https://csfloat.com/*"],
   "action": {
     "default_title": "CSFloat DB Sticker Linker"
   },

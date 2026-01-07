@@ -138,3 +138,79 @@ button:hover {
   color: #1d4ed8;
   word-break: break-all;
 }
+
+.results-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.result-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f0f2f8;
+}
+
+.result-meta {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: #4b5262;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    background-color: #0f1117;
+    color: #e8eaf0;
+  }
+
+  body {
+    background-color: #0f1117;
+  }
+
+  .card {
+    background: #171a24;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  }
+
+  p {
+    color: #a6adbd;
+  }
+
+  .checkbox {
+    background: #232838;
+  }
+
+  input[type="number"] {
+    background: #0f1117;
+    color: #e8eaf0;
+    border-color: #2e3446;
+  }
+
+  button {
+    background: #3b82f6;
+  }
+
+  button:hover {
+    background: #2563eb;
+  }
+
+  .output a {
+    color: #93c5fd;
+  }
+
+  .result-item {
+    background: #232838;
+  }
+
+  .result-meta {
+    color: #a6adbd;
+  }
+}
