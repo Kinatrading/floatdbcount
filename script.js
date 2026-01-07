@@ -23,6 +23,7 @@ const resultsList = document.getElementById("results-list");
 const summaryList = document.getElementById("summary-list");
 const progressBar = document.getElementById("progress-bar");
 const progressMeta = document.getElementById("progress-meta");
+const rateLimitDisplay = document.getElementById("rate-limit");
 const downloadCsvButton = document.getElementById("download-csv");
 const languageSelect = document.getElementById("language-select");
 
@@ -177,6 +178,17 @@ const updateProgress = (current, total) => {
   progressMeta.textContent = t("progressMeta")
     .replace("{current}", safeCurrent)
     .replace("{total}", safeTotal);
+};
+
+const updateRateLimitDisplay = ({ remaining, limit, resetTime } = {}) => {
+  if (!rateLimitDisplay) {
+    return;
+  }
+  if (remaining == null || limit == null || !resetTime) {
+    rateLimitDisplay.textContent = "—";
+    return;
+  }
+  rateLimitDisplay.textContent = `${remaining}/${limit}/ ${resetTime}`;
 };
 
 const initCardToggles = () => {
@@ -706,6 +718,15 @@ const loadStickerData = async () => {
     renderSelectedStickers([...selectedStickerMap.values()]);
   }
 };
+
+if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.action !== "rateLimitUpdate") {
+      return;
+    }
+    updateRateLimitDisplay(message.payload);
+  });
+}
 
 runBtn.addEventListener("click", () => {
   const selectedStickers = [...selectedStickerMap.values()];
