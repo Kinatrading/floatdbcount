@@ -390,7 +390,6 @@ button:disabled {
 }
 
 .summary-image {
-  width: 220px;
   height: 220px;
   object-fit: contain;
   border-radius: 12px;
@@ -399,6 +398,7 @@ button:disabled {
 
 .summary-image.is-empty {
   background: rgba(255, 255, 255, 0.08);
+  display:none;
 }
 
 .summary-export {
