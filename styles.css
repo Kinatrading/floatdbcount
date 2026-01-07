@@ -236,6 +236,12 @@ button:disabled {
   color: #4b5262;
 }
 
+.rate-limit {
+  font-size: 12px;
+  color: #b45309;
+  margin-top: 6px;
+}
+
 .suggestions {
   list-style: none;
   padding: 0;
@@ -450,6 +456,10 @@ button:disabled {
 
   .progress-meta {
     color: #a6adbd;
+  }
+
+  .rate-limit {
+    color: #facc15;
   }
 
   .result-item {
