@@ -50,7 +50,14 @@ const waitForCountInTab = async (tabId) => {
         intervalId = setInterval(checkAndResolve, 1000);
 
         observer = new MutationObserver(checkAndResolve);
-        observer.observe(document.body, { childList: true, subtree: true });
+        // CSFloat often updates the "Items Found" text by changing an existing text node,
+        // which does NOT trigger childList mutations. Watch characterData/attributes too.
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+          attributes: true
+        });
 
         window.addEventListener("load", checkAndResolve, { once: true });
       });
