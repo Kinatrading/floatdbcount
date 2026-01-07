@@ -15,38 +15,44 @@ const waitForCountInTab = async (tabId) => {
           !/NaN/i.test(text) &&
           /[0-9]/.test(text);
 
-        const existing = document.querySelector(".count");
-        if (existing) {
-          const text = existing.textContent?.trim();
-          if (isValidCount(text)) {
-            resolve(text);
-            return;
-          }
-        }
+        const getCountText = () =>
+          document.querySelector(".count")?.textContent?.trim() ?? null;
 
         let observer;
+        let intervalId;
 
         const timeout = setTimeout(() => {
           if (observer) {
             observer.disconnect();
           }
+          if (intervalId) {
+            clearInterval(intervalId);
+          }
           resolve(null);
         }, 120000);
 
-        observer = new MutationObserver(() => {
-          const element = document.querySelector(".count");
-          if (!element) {
-            return;
-          }
-          const text = element.textContent?.trim();
+        const checkAndResolve = () => {
+          const text = getCountText();
           if (isValidCount(text)) {
             clearTimeout(timeout);
-            observer.disconnect();
+            if (observer) {
+              observer.disconnect();
+            }
+            if (intervalId) {
+              clearInterval(intervalId);
+            }
             resolve(text);
           }
-        });
+        };
 
+        checkAndResolve();
+
+        intervalId = setInterval(checkAndResolve, 1000);
+
+        observer = new MutationObserver(checkAndResolve);
         observer.observe(document.body, { childList: true, subtree: true });
+
+        window.addEventListener("load", checkAndResolve, { once: true });
       });
     }
   });
