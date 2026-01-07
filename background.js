@@ -20,17 +20,19 @@ const waitForCountInTab = async (tabId) => {
           let stableCount = 0;
 
           const timer = setInterval(() => {
+            if (Date.now() - started > timeoutMs) {
+              clearInterval(timer);
+              reject(new Error("Timeout: count did not become readable"));
+              return;
+            }
+
             const el = document.querySelector(selector);
             if (!el) {
-              if (Date.now() - started > timeoutMs) {
-                clearInterval(timer);
-                reject(new Error("Timeout: count element not found"));
-              }
               return;
             }
 
             const text = (el.textContent || "").trim();
-            const match = text.match(/^([\d,.\s]+)\s+Items\s+Found$/i);
+            const match = text.match(/([\d,.\s]+)\s+Items\s+Found/i);
             if (!match) {
               return;
             }
@@ -55,7 +57,9 @@ const waitForCountInTab = async (tabId) => {
         });
       };
 
-      return waitForItemsFound({ selector: ".count" }).catch(() => null);
+      return waitForItemsFound({
+        selector: "div.count-container > div.count"
+      }).catch(() => null);
     }
   });
 
