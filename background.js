@@ -25,7 +25,7 @@ const waitForCountInTab = async (tabId) => {
             observer.disconnect();
           }
           resolve(null);
-        }, 20000);
+        }, 120000);
 
         observer = new MutationObserver(() => {
           const element = document.querySelector(".count");
