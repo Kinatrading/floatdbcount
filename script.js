@@ -92,30 +92,21 @@ categoryCheckboxes.forEach((checkbox) => {
   });
 });
 
-const updateRaritySelection = (changed) => {
-  if (!changed.checked) {
-    const anyChecked = rarityCheckboxes.some((checkbox) => checkbox.checked);
-    if (!anyChecked) {
-      rarityCheckboxes[0].checked = true;
-    }
-    return;
-  }
-
-  if (changed.value === "all") {
-    rarityCheckboxes.forEach((checkbox) => {
-      checkbox.checked = checkbox.value === "all";
-    });
-    return;
-  }
-
-  rarityCheckboxes.forEach((checkbox) => {
-    checkbox.checked = checkbox === changed;
-  });
-};
-
 rarityCheckboxes.forEach((checkbox) => {
   checkbox.addEventListener("change", (event) => {
-    updateRaritySelection(event.target);
+    if (event.target.value === "all" && event.target.checked) {
+      rarityCheckboxes.forEach((checkboxItem) => {
+        checkboxItem.checked = checkboxItem.value === "all";
+      });
+    } else {
+      rarityCheckboxes.find((checkboxItem) => checkboxItem.value === "all").checked = false;
+    }
+
+    const anySelected = rarityCheckboxes.some((checkboxItem) => checkboxItem.checked);
+    if (!anySelected) {
+      rarityCheckboxes.find((checkboxItem) => checkboxItem.value === "all").checked = true;
+    }
+
     updateStickerSuggestions();
     updateCollectionSuggestions();
   });
@@ -267,17 +258,20 @@ const selectedStickerMap = new Map();
 
 const normalizeValue = (value) => value.toLowerCase().trim();
 
-const getActiveRarity = () => {
-  const selected = rarityCheckboxes.find((checkbox) => checkbox.checked)?.value;
-  return selected && selected !== "all" ? selected : null;
+const getActiveRarities = () => {
+  const selected = rarityCheckboxes
+    .filter((checkbox) => checkbox.checked)
+    .map((checkbox) => checkbox.value)
+    .filter((value) => value !== "all");
+  return selected;
 };
 
 const stickerMatchesRarity = (sticker) => {
-  const rarity = getActiveRarity();
-  if (!rarity) {
+  const rarities = getActiveRarities();
+  if (rarities.length === 0) {
     return true;
   }
-  return sticker.rarity?.name === rarity;
+  return rarities.includes(sticker.rarity?.name);
 };
 
 const getStickerSearchHaystack = (sticker) => {
@@ -348,7 +342,7 @@ const updateCollectionSuggestions = () => {
 };
 
 const addCollectionStickers = (collection) => {
-  const rarity = getActiveRarity();
+  const rarities = getActiveRarities();
   stickersData
     .filter((sticker) => {
       const hasCollection = sticker.crates?.some(
@@ -357,10 +351,10 @@ const addCollectionStickers = (collection) => {
       if (!hasCollection) {
         return false;
       }
-      if (!rarity) {
+      if (rarities.length === 0) {
         return true;
       }
-      return sticker.rarity?.name === rarity;
+      return rarities.includes(sticker.rarity?.name);
     })
     .forEach((sticker) => {
       selectedStickerMap.set(sticker.def_index, sticker);
@@ -375,8 +369,8 @@ const loadStickerData = async () => {
   try {
     const url =
       typeof chrome !== "undefined" && chrome.runtime?.getURL
-        ? chrome.runtime.getURL("stickers.json")
-        : "stickers.json";
+        ? chrome.runtime.getURL("stickers_clean.json")
+        : "stickers_clean.json";
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error("Failed to load stickers.json");
