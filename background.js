@@ -53,7 +53,8 @@ chrome.webRequest.onHeadersReceived.addListener(
       payload: {
         remaining: Number.isFinite(remaining) ? remaining : null,
         limit: Number.isFinite(limit) ? limit : RATE_LIMIT_DEFAULT,
-        resetTime: formatResetTime(resetDate)
+        resetTime: formatResetTime(resetDate),
+        resetTimeMs: resetDate.getTime()
       }
     });
   },
