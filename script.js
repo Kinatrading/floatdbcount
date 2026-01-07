@@ -57,6 +57,9 @@ const translations = {
     resultsLabel: "Посилання та кількість:",
     summaryLabel: "Збережений підсумок:",
     downloadCsv: "Завантажити CSV",
+    exportImage: "Експорт картинки",
+    exportTitle: "CS2 STICKER HIGHLIGHT",
+    exportTotalLabel: "ЗАГАЛЬНО ПОКЛЕЄНО",
     resultsTitle: "Результати",
     waiting: "Очікування...",
     notFound: "Не знайдено",
@@ -102,6 +105,9 @@ const translations = {
     resultsLabel: "Links and count:",
     summaryLabel: "Saved summary:",
     downloadCsv: "Download CSV",
+    exportImage: "Export image",
+    exportTitle: "CS2 STICKER HIGHLIGHT",
+    exportTotalLabel: "TOTAL POOLS",
     resultsTitle: "Results",
     waiting: "Waiting...",
     notFound: "Not found",
@@ -299,6 +305,120 @@ const buildCsv = (items) => {
   return [headers, ...rows]
     .map((row) => row.map(escapeCsvValue).join(","))
     .join("\n");
+};
+
+const sanitizeFileName = (value) =>
+  String(value).replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
+
+const waitForImage = (image) =>
+  new Promise((resolve) => {
+    if (!image) {
+      resolve();
+      return;
+    }
+    if (image.complete) {
+      resolve();
+      return;
+    }
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
+  });
+
+const exportSummaryImage = async (summary) => {
+  if (typeof html2canvas === "undefined") {
+    return;
+  }
+  const counts = summary.pureCounts || [];
+  const posterRoot = document.createElement("div");
+  posterRoot.className = "poster-root";
+
+  const poster = document.createElement("div");
+  poster.className = "poster-card";
+
+  const header = document.createElement("div");
+  header.className = "poster-header";
+  header.textContent = t("exportTitle");
+
+  const name = document.createElement("div");
+  name.className = "poster-name";
+  name.textContent = summary.title || summary.name;
+
+  const imageWrap = document.createElement("div");
+  imageWrap.className = "poster-image";
+
+  const image = document.createElement("img");
+  image.className = "poster-sticker";
+  image.alt = summary.title || summary.name;
+  image.src = summary.image || "";
+  image.crossOrigin = "anonymous";
+  image.referrerPolicy = "no-referrer";
+  imageWrap.appendChild(image);
+
+  const stats = document.createElement("div");
+  stats.className = "poster-stats";
+
+  const countBlock = document.createElement("div");
+  countBlock.className = "poster-counts";
+
+  const countMain = document.createElement("div");
+  countMain.className = "poster-counts-main";
+  countMain.textContent = `1 / ${formatLocaleNumber(counts[0] || 0)}`;
+
+  const countSecondary = document.createElement("div");
+  countSecondary.className = "poster-counts-sub";
+  countSecondary.textContent = `2 / ${formatLocaleNumber(counts[1] || 0)} - 3 / ${formatLocaleNumber(
+    counts[2] || 0
+  )}`;
+
+  const countThird = document.createElement("div");
+  countThird.className = "poster-counts-sub";
+  countThird.textContent = `4 / ${formatLocaleNumber(counts[3] || 0)} - 5 / ${formatLocaleNumber(
+    counts[4] || 0
+  )}`;
+
+  countBlock.append(countMain, countSecondary, countThird);
+
+  const totalBlock = document.createElement("div");
+  totalBlock.className = "poster-total";
+
+  const totalLabel = document.createElement("div");
+  totalLabel.className = "poster-total-label";
+  totalLabel.textContent = t("exportTotalLabel");
+
+  const totalValue = document.createElement("div");
+  totalValue.className = "poster-total-value";
+  totalValue.textContent = formatLocaleNumber(summary.total);
+
+  totalBlock.append(totalLabel, totalValue);
+  stats.append(countBlock, totalBlock);
+
+  const date = document.createElement("div");
+  date.className = "poster-date";
+  date.textContent = formatLocaleDate(summary.date);
+
+  poster.append(header, name, imageWrap, stats, date);
+  posterRoot.appendChild(poster);
+  document.body.appendChild(posterRoot);
+
+  await waitForImage(image);
+  if (document.fonts?.ready) {
+    await document.fonts.ready;
+  }
+
+  const canvas = await html2canvas(poster, {
+    useCORS: true,
+    scale: 2,
+    backgroundColor: null
+  });
+
+  const link = document.createElement("a");
+  const fileBase = summary.title || summary.name || "sticker-summary";
+  link.download = `${sanitizeFileName(fileBase)}.png`;
+  link.href = canvas.toDataURL("image/png");
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  posterRoot.remove();
 };
 
 const syncDisplays = (minValue, maxValue) => {
@@ -541,6 +661,9 @@ const renderSummary = (summaryItems) => {
     const item = document.createElement("div");
     item.className = "summary-item";
 
+    const content = document.createElement("div");
+    content.className = "summary-content";
+
     const title = document.createElement("strong");
     title.textContent = summary.name;
 
@@ -564,7 +687,32 @@ const renderSummary = (summaryItems) => {
       formatLocaleDate(summary.date)
     );
 
-    item.append(title, counts, total, date);
+    content.append(title, counts, total, date);
+
+    const aside = document.createElement("div");
+    aside.className = "summary-aside";
+
+    const image = document.createElement("img");
+    image.className = "summary-image";
+    image.alt = summary.title || summary.name;
+    image.crossOrigin = "anonymous";
+    image.referrerPolicy = "no-referrer";
+    if (summary.image) {
+      image.src = summary.image;
+    } else {
+      image.classList.add("is-empty");
+    }
+
+    const exportButton = document.createElement("button");
+    exportButton.type = "button";
+    exportButton.className = "secondary-button summary-export";
+    exportButton.textContent = t("exportImage");
+    exportButton.addEventListener("click", () => {
+      exportSummaryImage(summary);
+    });
+
+    aside.append(image, exportButton);
+    item.append(content, aside);
     summaryList.appendChild(item);
   });
 };
@@ -741,15 +889,21 @@ languageSelect.addEventListener("change", (event) => {
 
 const loadStickerData = async () => {
   try {
-    const url =
+    const buildUrl = (name) =>
       typeof chrome !== "undefined" && chrome.runtime?.getURL
-        ? chrome.runtime.getURL("stickers_clean.json")
-        : "stickers_clean.json";
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error("Failed to load stickers.json");
+        ? chrome.runtime.getURL(name)
+        : name;
+    const response = await fetch(buildUrl("stickers_clean.json"));
+    let data = null;
+    if (response.ok) {
+      data = await response.json();
+    } else {
+      const fallbackResponse = await fetch(buildUrl("stickers.clean.json"));
+      if (!fallbackResponse.ok) {
+        throw new Error("Failed to load stickers.json");
+      }
+      data = await fallbackResponse.json();
     }
-    const data = await response.json();
     if (!Array.isArray(data)) {
       throw new Error("Invalid sticker data");
     }
@@ -865,6 +1019,9 @@ runBtn.addEventListener("click", () => {
       if (totals) {
         summaryItems.push({
           name: `${sticker.name} (${sticker.def_index})`,
+          title: sticker.name,
+          defIndex: sticker.def_index,
+          image: sticker.image,
           pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
           total: totals.total,
           date: new Date().toISOString()
