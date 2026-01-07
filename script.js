@@ -7,11 +7,17 @@ const minInput = document.getElementById("min-input");
 const maxInput = document.getElementById("max-input");
 const minDisplay = document.getElementById("min-display");
 const maxDisplay = document.getElementById("max-display");
-const stickerIdInput = document.getElementById("sticker-id");
+const stickerSearchInput = document.getElementById("sticker-search");
+const stickerSuggestions = document.getElementById("sticker-suggestions");
+const collectionSearchInput = document.getElementById("collection-search");
+const collectionSuggestions = document.getElementById("collection-suggestions");
+const rarityCheckboxes = Array.from(
+  document.querySelectorAll('input[name="rarity"]')
+);
+const selectedStickersList = document.getElementById("selected-stickers");
 const runBtn = document.getElementById("run-btn");
 const generatedLink = document.getElementById("generated-link");
 const resultsList = document.getElementById("results-list");
-const totalStickers = document.getElementById("total-stickers");
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -86,6 +92,35 @@ categoryCheckboxes.forEach((checkbox) => {
   });
 });
 
+const updateRaritySelection = (changed) => {
+  if (!changed.checked) {
+    const anyChecked = rarityCheckboxes.some((checkbox) => checkbox.checked);
+    if (!anyChecked) {
+      rarityCheckboxes[0].checked = true;
+    }
+    return;
+  }
+
+  if (changed.value === "all") {
+    rarityCheckboxes.forEach((checkbox) => {
+      checkbox.checked = checkbox.value === "all";
+    });
+    return;
+  }
+
+  rarityCheckboxes.forEach((checkbox) => {
+    checkbox.checked = checkbox === changed;
+  });
+};
+
+rarityCheckboxes.forEach((checkbox) => {
+  checkbox.addEventListener("change", (event) => {
+    updateRaritySelection(event.target);
+    updateStickerSuggestions();
+    updateCollectionSuggestions();
+  });
+});
+
 minRange.addEventListener("input", handleRangeChange);
 maxRange.addEventListener("input", handleRangeChange);
 minInput.addEventListener("change", handleNumberChange);
@@ -114,10 +149,53 @@ const buildUrl = (stickerId, count) => {
   return url.toString();
 };
 
-const renderResults = (items) => {
-  resultsList.innerHTML = "";
+const parseItemsFoundCount = (text) => {
+  if (!text) {
+    return null;
+  }
+  const match = text.match(/([\d,.\s]+)\s+Items\s+Found/i);
+  if (!match) {
+    return null;
+  }
+  const value = parseInt(match[1].replace(/[^\d]/g, ""), 10);
+  return Number.isFinite(value) ? value : null;
+};
+
+const computeTotalStickers = (items) => {
+  const counts = items.map((item) => parseItemsFoundCount(item.found));
+  if (counts.some((count) => count === null)) {
+    return null;
+  }
+
+  const pureCounts = [
+    counts[0] - counts[1],
+    counts[1] - counts[2],
+    counts[2] - counts[3],
+    counts[3] - counts[4],
+    counts[4]
+  ];
+
+  return pureCounts.reduce((sum, value, index) => sum + value * (index + 1), 0);
+};
+
+const renderStickerResults = (sticker, items) => {
+  const existing = resultsList.querySelector(
+    `[data-sticker-id="${sticker.def_index}"]`
+  );
+  if (existing) {
+    existing.remove();
+  }
+
+  const block = document.createElement("div");
+  block.className = "sticker-block";
+  block.dataset.stickerId = sticker.def_index;
+
+  const title = document.createElement("h3");
+  title.textContent = `${sticker.name} (${sticker.def_index})`;
+  block.appendChild(title);
+
   items.forEach((item) => {
-    const listItem = document.createElement("li");
+    const listItem = document.createElement("div");
     listItem.className = "result-item";
 
     const meta = document.createElement("div");
@@ -141,75 +219,228 @@ const renderResults = (items) => {
     link.rel = "noreferrer";
 
     listItem.append(meta, link);
-    resultsList.appendChild(listItem);
+    block.appendChild(listItem);
+  });
+
+  const total = computeTotalStickers(items);
+  const totalLabel = document.createElement("div");
+  totalLabel.className = "sticker-total";
+  totalLabel.textContent =
+    total === null
+      ? "Загальна кількість поклеєних стікерів: —"
+      : `Загальна кількість поклеєних стікерів: ${total.toLocaleString()}`;
+  block.appendChild(totalLabel);
+
+  resultsList.appendChild(block);
+};
+
+const renderSelectedStickers = (stickers) => {
+  selectedStickersList.innerHTML = "";
+  if (stickers.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "selected-item";
+    empty.textContent = "Наліпки не обрані.";
+    selectedStickersList.appendChild(empty);
+    return;
+  }
+
+  stickers.forEach((sticker) => {
+    const item = document.createElement("li");
+    item.className = "selected-item";
+    const label = document.createElement("span");
+    label.textContent = `${sticker.name} (${sticker.def_index})`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Видалити";
+    remove.addEventListener("click", () => {
+      selectedStickerMap.delete(sticker.def_index);
+      renderSelectedStickers([...selectedStickerMap.values()]);
+    });
+    item.append(label, remove);
+    selectedStickersList.appendChild(item);
   });
 };
 
-const parseItemsFoundCount = (text) => {
-  if (!text) {
-    return null;
-  }
-  const match = text.match(/([\d,.\s]+)\s+Items\s+Found/i);
-  if (!match) {
-    return null;
-  }
-  const value = parseInt(match[1].replace(/[^\d]/g, ""), 10);
-  return Number.isFinite(value) ? value : null;
+let stickersData = [];
+let collectionsData = [];
+const selectedStickerMap = new Map();
+
+const normalizeValue = (value) => value.toLowerCase().trim();
+
+const getActiveRarity = () => {
+  const selected = rarityCheckboxes.find((checkbox) => checkbox.checked)?.value;
+  return selected && selected !== "all" ? selected : null;
 };
 
-const updateTotalStickers = (items) => {
-  const counts = items.map((item) => parseItemsFoundCount(item.found));
-  if (counts.some((count) => count === null)) {
-    totalStickers.textContent = "—";
+const stickerMatchesRarity = (sticker) => {
+  const rarity = getActiveRarity();
+  if (!rarity) {
+    return true;
+  }
+  return sticker.rarity?.name === rarity;
+};
+
+const updateStickerSuggestions = () => {
+  const query = normalizeValue(stickerSearchInput.value);
+  stickerSuggestions.innerHTML = "";
+  if (!query) {
     return;
   }
 
-  const pureCounts = [
-    counts[0] - counts[1],
-    counts[1] - counts[2],
-    counts[2] - counts[3],
-    counts[3] - counts[4],
-    counts[4]
-  ];
+  const matches = stickersData
+    .filter((sticker) => stickerMatchesRarity(sticker))
+    .filter((sticker) => normalizeValue(sticker.name).includes(query))
+    .slice(0, 8);
 
-  const total = pureCounts.reduce((sum, value, index) => sum + value * (index + 1), 0);
-  totalStickers.textContent = total.toLocaleString();
+  matches.forEach((sticker) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = `${sticker.name} (${sticker.def_index})`;
+    button.addEventListener("click", () => {
+      selectedStickerMap.set(sticker.def_index, sticker);
+      renderSelectedStickers([...selectedStickerMap.values()]);
+      stickerSearchInput.value = "";
+      stickerSuggestions.innerHTML = "";
+    });
+    item.appendChild(button);
+    stickerSuggestions.appendChild(item);
+  });
+};
+
+const updateCollectionSuggestions = () => {
+  const query = normalizeValue(collectionSearchInput.value);
+  collectionSuggestions.innerHTML = "";
+  if (!query) {
+    return;
+  }
+
+  const matches = collectionsData
+    .filter((collection) => normalizeValue(collection).includes(query))
+    .slice(0, 8);
+
+  matches.forEach((collection) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = collection;
+    button.addEventListener("click", () => {
+      addCollectionStickers(collection);
+      collectionSearchInput.value = "";
+      collectionSuggestions.innerHTML = "";
+    });
+    item.appendChild(button);
+    collectionSuggestions.appendChild(item);
+  });
+};
+
+const addCollectionStickers = (collection) => {
+  const rarity = getActiveRarity();
+  stickersData
+    .filter((sticker) => {
+      const hasCollection = sticker.crates?.some(
+        (crate) => crate.name === collection
+      );
+      if (!hasCollection) {
+        return false;
+      }
+      if (!rarity) {
+        return true;
+      }
+      return sticker.rarity?.name === rarity;
+    })
+    .forEach((sticker) => {
+      selectedStickerMap.set(sticker.def_index, sticker);
+    });
+  renderSelectedStickers([...selectedStickerMap.values()]);
+};
+
+stickerSearchInput.addEventListener("input", updateStickerSuggestions);
+collectionSearchInput.addEventListener("input", updateCollectionSuggestions);
+
+const loadStickerData = async () => {
+  try {
+    const response = await fetch("stickers.json");
+    if (!response.ok) {
+      throw new Error("Failed to load stickers.json");
+    }
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      throw new Error("Invalid sticker data");
+    }
+    stickersData = data;
+    collectionsData = Array.from(
+      new Set(
+        data.flatMap((sticker) =>
+          (sticker.crates || []).map((crate) => crate.name)
+        )
+      )
+    ).sort();
+  } catch (error) {
+    stickersData = [];
+    collectionsData = [];
+  } finally {
+    renderSelectedStickers([...selectedStickerMap.values()]);
+  }
 };
 
 runBtn.addEventListener("click", () => {
-  const stickerId = stickerIdInput.value.trim();
-  if (!stickerId) {
-    alert("Вкажіть номер наліпки.");
+  const selectedStickers = [...selectedStickerMap.values()];
+  if (selectedStickers.length === 0) {
+    alert("Оберіть хоча б одну наліпку.");
     return;
   }
 
-  const urls = [1, 2, 3, 4, 5].map((count) => ({
-    count,
-    url: buildUrl(stickerId, count)
-  }));
-
-  generatedLink.href = urls[0].url;
-  generatedLink.textContent = urls[0].url;
-  renderResults(urls.map((item) => ({ ...item, found: null, loading: true })));
-  totalStickers.textContent = "—";
-
+  resultsList.innerHTML = "";
+  generatedLink.href = "#";
+  generatedLink.textContent = "—";
   runBtn.disabled = true;
-  chrome.runtime.sendMessage({ action: "runCounts", urls: urls.map((u) => u.url) }, (response) => {
-    runBtn.disabled = false;
-    if (!response?.results) {
-      renderResults(urls.map((item) => ({ ...item, found: null, loading: false })));
-      return;
-    }
+  const runSequential = async () => {
+    for (const sticker of selectedStickers) {
+      const urls = [1, 2, 3, 4, 5].map((count) => ({
+        count,
+        url: buildUrl(sticker.def_index, count)
+      }));
 
-    const results = response.results.map((result, index) => ({
-      count: index + 1,
-      url: result.url,
-      found: result.count,
-      loading: false
-    }));
-    renderResults(results);
-    updateTotalStickers(results);
+      if (generatedLink.textContent === "—") {
+        generatedLink.href = urls[0].url;
+        generatedLink.textContent = urls[0].url;
+      }
+
+      renderStickerResults(
+        sticker,
+        urls.map((item) => ({ ...item, found: null, loading: true }))
+      );
+
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { action: "runCounts", urls: urls.map((u) => u.url) },
+          resolve
+        );
+      });
+
+      if (!response?.results) {
+        renderStickerResults(
+          sticker,
+          urls.map((item) => ({ ...item, found: null, loading: false }))
+        );
+        continue;
+      }
+
+      const results = response.results.map((result, index) => ({
+        count: index + 1,
+        url: result.url,
+        found: result.count,
+        loading: false
+      }));
+      renderStickerResults(sticker, results);
+    }
+  };
+
+  runSequential().finally(() => {
+    runBtn.disabled = false;
   });
 });
 
 syncInputs(0, 1);
+loadStickerData();

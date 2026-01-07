@@ -78,9 +78,48 @@
       <section class="card">
         <h2>Наліпки</h2>
         <label class="full-width">
-          Номер наліпки
-          <input type="number" id="sticker-id" placeholder="343" min="1" />
+          Пошук наліпки
+          <input type="text" id="sticker-search" placeholder="Sticker | Fearsome" autocomplete="off" />
         </label>
+        <ul id="sticker-suggestions" class="suggestions"></ul>
+        <label class="full-width">
+          Пошук колекції
+          <input type="text" id="collection-search" placeholder="Sticker Capsule" autocomplete="off" />
+        </label>
+        <ul id="collection-suggestions" class="suggestions"></ul>
+        <div class="rarity-filter">
+          <span>Грейд:</span>
+          <div class="checkbox-grid" role="group" aria-label="Грейд наліпок">
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="all" checked />
+              <span>Усі</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="Consumer Grade" />
+              <span>Consumer</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="High Grade" />
+              <span>High Grade</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="Remarkable" />
+              <span>Remarkable</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="Exotic" />
+              <span>Exotic</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="Extraordinary" />
+              <span>Extraordinary</span>
+            </label>
+          </div>
+        </div>
+        <div class="selected-block">
+          <span>Обрані наліпки:</span>
+          <ul id="selected-stickers" class="selected-list"></ul>
+        </div>
       </section>
 
       <section class="card actions">
@@ -91,11 +130,7 @@
         </div>
         <div class="output">
           <span>Посилання та кількість:</span>
-          <ul id="results-list" class="results-list"></ul>
-        </div>
-        <div class="output total-output">
-          <span>Загальна кількість поклеєних стікерів:</span>
-          <strong id="total-stickers">—</strong>
+          <div id="results-list" class="results-list"></div>
         </div>
       </section>
     </main>

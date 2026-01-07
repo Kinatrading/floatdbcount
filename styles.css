@@ -98,7 +98,8 @@ label {
   font-size: 14px;
 }
 
-input[type="number"] {
+input[type="number"],
+input[type="text"] {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid #d4d8e5;
@@ -139,13 +140,76 @@ button:hover {
   word-break: break-all;
 }
 
-.results-list {
+.suggestions {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
+  gap: 6px;
+}
+
+.suggestions button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d4d8e5;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.suggestions button:hover {
+  background: #eef2ff;
+}
+
+.rarity-filter {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  font-size: 14px;
+}
+
+.selected-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.selected-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.selected-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #f0f2f8;
+  font-size: 13px;
+}
+
+.selected-item button {
+  background: transparent;
+  color: #d64545;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .result-item {
@@ -165,8 +229,24 @@ button:hover {
   color: #4b5262;
 }
 
-.total-output strong {
-  font-size: 18px;
+.sticker-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f7f8fc;
+  border: 1px solid #e1e6f2;
+}
+
+.sticker-block h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.sticker-total {
+  font-size: 14px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -193,7 +273,26 @@ button:hover {
     background: #232838;
   }
 
-  input[type="number"] {
+  .suggestions button {
+    background: #171a24;
+    border-color: #2e3446;
+    color: #e8eaf0;
+  }
+
+  .suggestions button:hover {
+    background: #232838;
+  }
+
+  .selected-item {
+    background: #232838;
+  }
+
+  .selected-item button {
+    color: #fca5a5;
+  }
+
+  input[type="number"],
+  input[type="text"] {
     background: #0f1117;
     color: #e8eaf0;
     border-color: #2e3446;
@@ -219,7 +318,12 @@ button:hover {
     color: #a6adbd;
   }
 
-  .total-output strong {
+  .sticker-block {
+    background: #171a24;
+    border-color: #2e3446;
+  }
+
+  .sticker-total {
     color: #e8eaf0;
   }
 }
