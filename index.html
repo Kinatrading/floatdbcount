@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSFloat DB Sticker Linker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>CSFloat DB Sticker Linker</h1>
+        <p>Згенеруйте посилання для пошуку скінів по наліпках та float.</p>
+      </header>
+
+      <section class="card">
+        <h2>Категорія предметів</h2>
+        <div class="checkbox-grid" role="group" aria-label="Категорія">
+          <label class="checkbox">
+            <input type="checkbox" name="category" value="all" checked />
+            <span>Усі</span>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="category" value="1" />
+            <span>Normal</span>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="category" value="2" />
+            <span>StatTrak</span>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="category" value="3" />
+            <span>Souvenir</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Діапазон float</h2>
+        <div class="range-wrapper">
+          <div class="range-values">
+            <span id="min-display">0.000000</span>
+            <span id="max-display">1.000000</span>
+          </div>
+          <div class="range-controls">
+            <input
+              type="range"
+              id="min-range"
+              min="0"
+              max="1"
+              step="0.000001"
+              value="0"
+              aria-label="Мінімальний float"
+            />
+            <input
+              type="range"
+              id="max-range"
+              min="0"
+              max="1"
+              step="0.000001"
+              value="1"
+              aria-label="Максимальний float"
+            />
+          </div>
+        </div>
+        <div class="number-inputs">
+          <label>
+            Мінімум
+            <input type="number" id="min-input" step="0.000001" min="0" max="1" value="0" />
+          </label>
+          <label>
+            Максимум
+            <input type="number" id="max-input" step="0.000001" min="0" max="1" value="1" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Наліпки</h2>
+        <label class="full-width">
+          Пошук наліпки
+          <input type="text" id="sticker-search" placeholder="Sticker | Fearsome" autocomplete="off" />
+        </label>
+        <ul id="sticker-suggestions" class="suggestions"></ul>
+        <label class="full-width">
+          Пошук колекції
+          <input type="text" id="collection-search" placeholder="Sticker Capsule" autocomplete="off" />
+        </label>
+        <ul id="collection-suggestions" class="suggestions"></ul>
+        <div class="rarity-filter">
+          <span>Грейд:</span>
+          <div class="checkbox-grid" role="group" aria-label="Грейд наліпок">
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="all" checked />
+              <span>Усі</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="Consumer Grade" />
+              <span>Consumer</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="High Grade" />
+              <span>High Grade</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="Remarkable" />
+              <span>Remarkable</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="Exotic" />
+              <span>Exotic</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="rarity" value="Extraordinary" />
+              <span>Extraordinary</span>
+            </label>
+          </div>
+        </div>
+        <div class="selected-block">
+          <span>Обрані наліпки:</span>
+          <ul id="selected-stickers" class="selected-list"></ul>
+        </div>
+      </section>
+
+      <section class="card actions">
+        <button id="run-btn">Run</button>
+        <div class="output">
+          <span>Згенероване посилання:</span>
+          <a id="generated-link" href="#" target="_blank" rel="noreferrer">—</a>
+        </div>
+        <div class="output">
+          <span>Посилання та кількість:</span>
+          <div id="results-list" class="results-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
