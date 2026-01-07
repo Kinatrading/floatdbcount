@@ -375,19 +375,61 @@ button:disabled {
   z-index: -1;
 }
 
-.poster-card {
+.poster {
   width: 900px;
   height: 900px;
-  padding: 48px;
+  padding: 28px 28px 22px;
   border-radius: 28px;
-  color: #ffffff;
-  background: radial-gradient(circle at top, #2a1454, #0b0a1d 55%, #0a0b14);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+  color: #e8e8f2;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 800px at 50% 35%, rgba(168, 85, 247, 0.22), rgba(0, 0, 0, 0) 60%),
+    radial-gradient(900px 600px at 50% 60%, rgba(59, 130, 246, 0.14), rgba(0, 0, 0, 0) 65%),
+    linear-gradient(180deg, #090a1a 0%, #070817 45%, #050513 100%);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 20px;
   font-variant-numeric: tabular-nums;
+}
+
+.poster::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(
+    closest-side at 50% 42%,
+    rgba(255, 255, 255, 0.1),
+    rgba(168, 85, 247, 0.1),
+    rgba(0, 0, 0, 0) 60%
+  );
+  filter: blur(18px);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.poster::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.18) 0 1px, transparent 2px),
+    radial-gradient(circle at 70% 20%, rgba(255, 255, 255, 0.14) 0 1px, transparent 2px),
+    radial-gradient(circle at 45% 65%, rgba(255, 255, 255, 0.1) 0 1px, transparent 2px),
+    radial-gradient(circle at 85% 70%, rgba(255, 255, 255, 0.12) 0 1px, transparent 2px),
+    radial-gradient(circle at 15% 80%, rgba(255, 255, 255, 0.1) 0 1px, transparent 2px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.poster > * {
+  position: relative;
+  z-index: 1;
 }
 
 .poster-header {

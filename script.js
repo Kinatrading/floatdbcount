@@ -333,7 +333,7 @@ const exportSummaryImage = async (summary) => {
   posterRoot.className = "poster-root";
 
   const poster = document.createElement("div");
-  poster.className = "poster-card";
+  poster.className = "poster";
 
   const header = document.createElement("div");
   header.className = "poster-header";
@@ -349,9 +349,9 @@ const exportSummaryImage = async (summary) => {
   const image = document.createElement("img");
   image.className = "poster-sticker";
   image.alt = summary.title || summary.name;
-  image.src = summary.image || "";
   image.crossOrigin = "anonymous";
   image.referrerPolicy = "no-referrer";
+  image.src = summary.image || "";
   imageWrap.appendChild(image);
 
   const stats = document.createElement("div");
@@ -695,9 +695,9 @@ const renderSummary = (summaryItems) => {
     const image = document.createElement("img");
     image.className = "summary-image";
     image.alt = summary.title || summary.name;
-    image.crossOrigin = "anonymous";
-    image.referrerPolicy = "no-referrer";
     if (summary.image) {
+      image.crossOrigin = "anonymous";
+      image.referrerPolicy = "no-referrer";
       image.src = summary.image;
     } else {
       image.classList.add("is-empty");
