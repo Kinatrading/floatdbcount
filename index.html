@@ -9,7 +9,7 @@
   <body>
     <main class="container">
       <header>
-        <h1>CSFloat DB Sticker Linker</h1>
+        <h1>CSFloat DB Sticker Linker created by Kina</h1>
         <p>Згенеруйте посилання для пошуку скінів по наліпках та float.</p>
       </header>
 
@@ -114,6 +114,9 @@
         </div>
         <div class="selected-block">
           <span>Обрані наліпки:</span>
+          <button type="button" id="clear-stickers" class="secondary-button">
+            Видалити всі
+          </button>
           <ul id="selected-stickers" class="selected-list"></ul>
         </div>
       </section>
@@ -127,6 +130,10 @@
         <div class="output">
           <span>Посилання та кількість:</span>
           <div id="results-list" class="results-list"></div>
+        </div>
+        <div class="output">
+          <span>Збережений підсумок:</span>
+          <div id="summary-list" class="summary-list"></div>
         </div>
       </section>
     </main>

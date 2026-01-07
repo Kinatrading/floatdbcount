@@ -15,9 +15,11 @@ const rarityCheckboxes = Array.from(
   document.querySelectorAll('input[name="rarity"]')
 );
 const selectedStickersList = document.getElementById("selected-stickers");
+const clearStickersButton = document.getElementById("clear-stickers");
 const runBtn = document.getElementById("run-btn");
 const generatedLink = document.getElementById("generated-link");
 const resultsList = document.getElementById("results-list");
+const summaryList = document.getElementById("summary-list");
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -169,6 +171,20 @@ const computeTotalStickers = (items) => {
   return pureCounts.reduce((sum, value, index) => sum + value * (index + 1), 0);
 };
 
+const computePureCounts = (items) => {
+  const counts = items.map((item) => parseItemsFoundCount(item.found));
+  if (counts.some((count) => count === null)) {
+    return null;
+  }
+  return [
+    counts[0] - counts[1],
+    counts[1] - counts[2],
+    counts[2] - counts[3],
+    counts[3] - counts[4],
+    counts[4]
+  ];
+};
+
 const renderStickerResults = (sticker, items) => {
   const existing = resultsList.querySelector(
     `[data-sticker-id="${sticker.def_index}"]`
@@ -223,6 +239,37 @@ const renderStickerResults = (sticker, items) => {
   block.appendChild(totalLabel);
 
   resultsList.appendChild(block);
+};
+
+const renderSummary = (summaryItems) => {
+  summaryList.innerHTML = "";
+  if (summaryItems.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "summary-item";
+    empty.textContent = "Підсумок буде доступний після запуску.";
+    summaryList.appendChild(empty);
+    return;
+  }
+
+  summaryItems.forEach((summary) => {
+    const item = document.createElement("div");
+    item.className = "summary-item";
+
+    const title = document.createElement("strong");
+    title.textContent = summary.name;
+
+    const counts = document.createElement("div");
+    counts.textContent = `1х: ${summary.pureCounts[0]}, 2х: ${summary.pureCounts[1]}, 3х: ${summary.pureCounts[2]}, 4х: ${summary.pureCounts[3]}, 5х: ${summary.pureCounts[4]}`;
+
+    const total = document.createElement("div");
+    total.textContent = `Сумарна кількість поклеєних: ${summary.total}`;
+
+    const date = document.createElement("div");
+    date.textContent = `Дата: ${summary.date}`;
+
+    item.append(title, counts, total, date);
+    summaryList.appendChild(item);
+  });
 };
 
 const renderSelectedStickers = (stickers) => {
@@ -369,6 +416,10 @@ const addCollectionStickers = (collection) => {
 
 stickerSearchInput.addEventListener("input", updateStickerSuggestions);
 collectionSearchInput.addEventListener("input", updateCollectionSuggestions);
+clearStickersButton.addEventListener("click", () => {
+  selectedStickerMap.clear();
+  renderSelectedStickers([]);
+});
 
 const loadStickerData = async () => {
   try {
@@ -409,9 +460,11 @@ runBtn.addEventListener("click", () => {
   }
 
   resultsList.innerHTML = "";
+  summaryList.innerHTML = "";
   generatedLink.href = "#";
   generatedLink.textContent = "—";
   runBtn.disabled = true;
+  const summaryItems = [];
   const runSequential = async () => {
     for (const sticker of selectedStickers) {
       const urls = [1, 2, 3, 4, 5].map((count) => ({
@@ -451,13 +504,26 @@ runBtn.addEventListener("click", () => {
         loading: false
       }));
       renderStickerResults(sticker, results);
+
+      const pureCounts = computePureCounts(results);
+      const total = computeTotalStickers(results);
+      if (pureCounts && total !== null) {
+        summaryItems.push({
+          name: `${sticker.name} (${sticker.def_index})`,
+          pureCounts: pureCounts.map((value) => value.toLocaleString()),
+          total: total.toLocaleString(),
+          date: new Date().toLocaleString()
+        });
+      }
     }
   };
 
   runSequential().finally(() => {
     runBtn.disabled = false;
+    renderSummary(summaryItems);
   });
 });
 
 syncInputs(0, 1);
 loadStickerData();
+renderSummary([]);
