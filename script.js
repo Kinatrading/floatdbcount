@@ -23,6 +23,7 @@ const resultsList = document.getElementById("results-list");
 const summaryList = document.getElementById("summary-list");
 const progressBar = document.getElementById("progress-bar");
 const progressMeta = document.getElementById("progress-meta");
+const rateLimitDisplay = document.getElementById("rate-limit");
 const downloadCsvButton = document.getElementById("download-csv");
 const languageSelect = document.getElementById("language-select");
 
@@ -68,6 +69,7 @@ const translations = {
     summaryTotalLabel: "Сумарна кількість поклеєних: {total}",
     summaryDateLabel: "Дата: {date}",
     progressMeta: "{current} / {total}",
+    rateLimitLabel: "Лишилось запитів:",
     downloadCsvName: "sticker-summary.csv",
     csvStickerHeader: "Наліпка"
   },
@@ -112,6 +114,7 @@ const translations = {
     summaryTotalLabel: "Total applied: {total}",
     summaryDateLabel: "Date: {date}",
     progressMeta: "{current} / {total}",
+    rateLimitLabel: "Requests left:",
     downloadCsvName: "sticker-summary.csv",
     csvStickerHeader: "Sticker"
   }
@@ -120,6 +123,11 @@ const translations = {
 let currentLanguage = "uk";
 let summaryItems = [];
 let progressTotal = 0;
+let isPaused = false;
+let resumeTimerId = null;
+let pausePromise = null;
+let pausePromiseResolve = null;
+let lastRateLimitPayload = null;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -166,6 +174,9 @@ const applyTranslations = () => {
   updateProgress(0, progressTotal);
   renderSelectedStickers([...selectedStickerMap.values()]);
   renderSummary(summaryItems);
+  if (lastRateLimitPayload) {
+    updateRateLimitDisplay(lastRateLimitPayload);
+  }
 };
 
 const updateProgress = (current, total) => {
@@ -177,6 +188,58 @@ const updateProgress = (current, total) => {
   progressMeta.textContent = t("progressMeta")
     .replace("{current}", safeCurrent)
     .replace("{total}", safeTotal);
+};
+
+const updateRateLimitDisplay = ({ remaining, limit, resetTime } = {}) => {
+  if (!rateLimitDisplay) {
+    return;
+  }
+  lastRateLimitPayload = { remaining, limit, resetTime };
+  if (remaining == null || limit == null || !resetTime) {
+    rateLimitDisplay.textContent = "—";
+    return;
+  }
+  rateLimitDisplay.textContent = `${t("rateLimitLabel")} ${remaining}/${limit}/ ${resetTime}`;
+};
+
+const clearResumeTimer = () => {
+  if (resumeTimerId) {
+    clearTimeout(resumeTimerId);
+    resumeTimerId = null;
+  }
+};
+
+const setPauseState = ({ paused, resumeAtMs } = {}) => {
+  if (paused) {
+    isPaused = true;
+    if (!pausePromiseResolve) {
+      pausePromise = new Promise((resolve) => {
+        pausePromiseResolve = resolve;
+      });
+    }
+    if (resumeAtMs) {
+      clearResumeTimer();
+      const delay = Math.max(resumeAtMs - Date.now(), 0);
+      resumeTimerId = setTimeout(() => {
+        setPauseState({ paused: false });
+      }, delay);
+    }
+    return;
+  }
+  isPaused = false;
+  clearResumeTimer();
+  if (pausePromiseResolve) {
+    pausePromiseResolve();
+    pausePromiseResolve = null;
+    pausePromise = null;
+  }
+};
+
+const waitForResumeIfPaused = async () => {
+  if (!isPaused || !pausePromise) {
+    return;
+  }
+  await pausePromise;
 };
 
 const initCardToggles = () => {
@@ -707,6 +770,23 @@ const loadStickerData = async () => {
   }
 };
 
+if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.action !== "rateLimitUpdate") {
+      return;
+    }
+    const payload = message.payload || {};
+    updateRateLimitDisplay(payload);
+    if (payload.remaining != null) {
+      if (payload.remaining < 20) {
+        setPauseState({ paused: true, resumeAtMs: payload.resetTimeMs });
+      } else if (isPaused) {
+        setPauseState({ paused: false });
+      }
+    }
+  });
+}
+
 runBtn.addEventListener("click", () => {
   const selectedStickers = [...selectedStickerMap.values()];
   if (selectedStickers.length === 0) {
@@ -732,6 +812,10 @@ runBtn.addEventListener("click", () => {
   let processed = 0;
   const runSequential = async () => {
     for (const sticker of selectedStickers) {
+      if (stopRequested) {
+        break;
+      }
+      await waitForResumeIfPaused();
       if (stopRequested) {
         break;
       }
