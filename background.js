@@ -4,96 +4,6 @@ chrome.action.onClicked.addListener(() => {
   });
 });
 
-const RATE_LIMIT_TOTAL = 125;
-const RATE_LIMIT_BUFFER = 20;
-const RATE_LIMIT_STOP_AT = RATE_LIMIT_TOTAL - RATE_LIMIT_BUFFER;
-
-const ensureRateLimitPauseState = async () => {
-  const now = Math.floor(Date.now() / 1000);
-  const { rateLimitPaused, pauseUntil } = await chrome.storage.local.get([
-    "rateLimitPaused",
-    "pauseUntil"
-  ]);
-
-  if (rateLimitPaused && pauseUntil && now >= pauseUntil) {
-    await chrome.storage.local.set({ rateLimitPaused: false, pauseUntil: null });
-    return false;
-  }
-
-  return Boolean(rateLimitPaused);
-};
-
-const shouldPauseForRateLimit = (data) => {
-  if (!data) {
-    return false;
-  }
-  if (data.statusCode === 429) {
-    return true;
-  }
-  if (data.remaining !== null && data.remaining <= RATE_LIMIT_BUFFER) {
-    return true;
-  }
-  return false;
-};
-
-const parseRateLimitHeaders = (headers = []) => {
-  const lookup = {};
-  headers.forEach((header) => {
-    if (!header?.name) {
-      return;
-    }
-    lookup[header.name.toLowerCase()] = header.value;
-  });
-
-  const limit = lookup["x-ratelimit-limit"];
-  const remaining = lookup["x-ratelimit-remaining"];
-  const reset = lookup["x-ratelimit-reset"];
-
-  const toNumber = (value) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  };
-
-  return {
-    limit: toNumber(limit),
-    remaining: toNumber(remaining),
-    reset: toNumber(reset)
-  };
-};
-
-chrome.webRequest.onHeadersReceived.addListener(
-  (details) => {
-    const headerData = parseRateLimitHeaders(details.responseHeaders);
-    if (
-      headerData.limit === null &&
-      headerData.remaining === null &&
-      headerData.reset === null
-    ) {
-      return;
-    }
-
-    const data = {
-      ...headerData,
-      seenAt: Math.floor(Date.now() / 1000),
-      statusCode: details.statusCode,
-      url: details.url
-    };
-
-    chrome.storage.local.set({ rateLimit: data });
-
-    if (shouldPauseForRateLimit(data)) {
-      chrome.storage.local.set({
-        rateLimitPaused: true,
-        pauseUntil: data.reset ?? null
-      });
-    }
-
-    chrome.runtime.sendMessage({ type: "rateLimitUpdate", data }).catch(() => {});
-  },
-  { urls: ["*://csfloat.com/api/v1/floatdb/search*"] },
-  ["responseHeaders"]
-);
-
 const waitForCountInTab = async (tabId) => {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
@@ -162,21 +72,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   (async () => {
-    const isPaused = await ensureRateLimitPauseState();
-    if (isPaused) {
-      console.log("Rate limit paused – waiting for reset");
-      sendResponse({ results: [] });
-      return;
-    }
-
     const results = [];
     for (const url of message.urls) {
-      const pausedDuringRun = await ensureRateLimitPauseState();
-      if (pausedDuringRun) {
-        console.log("Rate limit paused – waiting for reset");
-        break;
-      }
-
       const tab = await chrome.tabs.create({ url, active: false });
       await new Promise((resolve) => {
         const listener = (tabId, info) => {
