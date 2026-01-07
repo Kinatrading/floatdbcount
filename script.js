@@ -310,162 +310,106 @@ const buildCsv = (items) => {
 const sanitizeFileName = (value) =>
   String(value).replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
 
-const loadImage = (url) =>
+const waitForImage = (image) =>
   new Promise((resolve) => {
-    if (!url) {
-      resolve(null);
+    if (!image) {
+      resolve();
       return;
     }
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.onload = () => resolve(image);
-    image.onerror = () => resolve(null);
-    image.src = url;
-  });
-
-const drawRoundedRect = (ctx, x, y, width, height, radius) => {
-  const r = Math.min(radius, width / 2, height / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + width, y, x + width, y + height, r);
-  ctx.arcTo(x + width, y + height, x, y + height, r);
-  ctx.arcTo(x, y + height, x, y, r);
-  ctx.arcTo(x, y, x + width, y, r);
-  ctx.closePath();
-};
-
-const drawWrappedText = (ctx, text, x, y, maxWidth, lineHeight) => {
-  const words = String(text).split(" ");
-  let line = "";
-  let currentY = y;
-  words.forEach((word, index) => {
-    const testLine = line ? `${line} ${word}` : word;
-    const { width } = ctx.measureText(testLine);
-    if (width > maxWidth && line) {
-      ctx.fillText(line, x, currentY);
-      line = word;
-      currentY += lineHeight;
-    } else {
-      line = testLine;
+    if (image.complete) {
+      resolve();
+      return;
     }
-    if (index === words.length - 1) {
-      ctx.fillText(line, x, currentY);
-    }
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
   });
-  return currentY;
-};
 
 const exportSummaryImage = async (summary) => {
-  const size = 900;
-  const scale = 2;
-  const canvas = document.createElement("canvas");
-  canvas.width = size * scale;
-  canvas.height = size * scale;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
+  if (typeof html2canvas === "undefined") {
     return;
   }
-  ctx.scale(scale, scale);
-
-  const gradient = ctx.createLinearGradient(0, 0, size, size);
-  gradient.addColorStop(0, "#0b0a1d");
-  gradient.addColorStop(0.5, "#1b1035");
-  gradient.addColorStop(1, "#0d0a22");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-
-  for (let i = 0; i < 60; i += 1) {
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    ctx.beginPath();
-    ctx.arc(
-      Math.random() * size,
-      Math.random() * size,
-      Math.random() * 2 + 1,
-      0,
-      Math.PI * 2
-    );
-    ctx.fill();
-  }
-
-  const panelPadding = 36;
-  const panelX = panelPadding;
-  const panelY = panelPadding;
-  const panelSize = size - panelPadding * 2;
-  drawRoundedRect(ctx, panelX, panelY, panelSize, panelSize, 32);
-  ctx.fillStyle = "rgba(10, 13, 30, 0.75)";
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.font = "600 20px Inter, sans-serif";
-  ctx.fillText(t("exportTitle"), size / 2, panelY + 48);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "700 36px Inter, sans-serif";
-  const titleMaxWidth = panelSize - 120;
-  const titleY = panelY + 100;
-  drawWrappedText(ctx, summary.title || summary.name, size / 2, titleY, titleMaxWidth, 42);
-
-  const image = await loadImage(summary.image);
-  if (image) {
-    const imageSize = 260;
-    const imageX = size / 2 - imageSize / 2;
-    const imageY = panelY + 170;
-    ctx.shadowColor = "rgba(255, 255, 255, 0.2)";
-    ctx.shadowBlur = 20;
-    ctx.drawImage(image, imageX, imageY, imageSize, imageSize);
-    ctx.shadowBlur = 0;
-  }
-
   const counts = summary.pureCounts || [];
-  const countX = panelX + 80;
-  const countY = panelY + 470;
-  ctx.textAlign = "left";
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "700 32px Inter, sans-serif";
-  ctx.fillText(
-    `1 / ${formatLocaleNumber(counts[0] || 0)}`,
-    countX,
-    countY
-  );
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
-  ctx.font = "600 20px Inter, sans-serif";
-  ctx.fillText(
-    `2 / ${formatLocaleNumber(counts[1] || 0)} - 3 / ${formatLocaleNumber(
-      counts[2] || 0
-    )}`,
-    countX,
-    countY + 36
-  );
-  ctx.fillText(
-    `4 / ${formatLocaleNumber(counts[3] || 0)} - 5 / ${formatLocaleNumber(
-      counts[4] || 0
-    )}`,
-    countX,
-    countY + 66
-  );
+  const posterRoot = document.createElement("div");
+  posterRoot.className = "poster-root";
 
-  ctx.textAlign = "right";
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.font = "600 18px Inter, sans-serif";
-  ctx.fillText(t("exportTotalLabel"), panelX + panelSize - 80, countY);
+  const poster = document.createElement("div");
+  poster.className = "poster-card";
 
-  ctx.fillStyle = "#facc15";
-  ctx.font = "800 48px Inter, sans-serif";
-  ctx.fillText(formatLocaleNumber(summary.total), panelX + panelSize - 80, countY + 52);
+  const header = document.createElement("div");
+  header.className = "poster-header";
+  header.textContent = t("exportTitle");
 
-  ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.font = "500 18px Inter, sans-serif";
-  ctx.fillText(
-    formatLocaleDate(summary.date),
-    size / 2,
-    panelY + panelSize - 32
-  );
+  const name = document.createElement("div");
+  name.className = "poster-name";
+  name.textContent = summary.title || summary.name;
+
+  const imageWrap = document.createElement("div");
+  imageWrap.className = "poster-image";
+
+  const image = document.createElement("img");
+  image.className = "poster-sticker";
+  image.alt = summary.title || summary.name;
+  image.src = summary.image || "";
+  image.crossOrigin = "anonymous";
+  image.referrerPolicy = "no-referrer";
+  imageWrap.appendChild(image);
+
+  const stats = document.createElement("div");
+  stats.className = "poster-stats";
+
+  const countBlock = document.createElement("div");
+  countBlock.className = "poster-counts";
+
+  const countMain = document.createElement("div");
+  countMain.className = "poster-counts-main";
+  countMain.textContent = `1 / ${formatLocaleNumber(counts[0] || 0)}`;
+
+  const countSecondary = document.createElement("div");
+  countSecondary.className = "poster-counts-sub";
+  countSecondary.textContent = `2 / ${formatLocaleNumber(counts[1] || 0)} - 3 / ${formatLocaleNumber(
+    counts[2] || 0
+  )}`;
+
+  const countThird = document.createElement("div");
+  countThird.className = "poster-counts-sub";
+  countThird.textContent = `4 / ${formatLocaleNumber(counts[3] || 0)} - 5 / ${formatLocaleNumber(
+    counts[4] || 0
+  )}`;
+
+  countBlock.append(countMain, countSecondary, countThird);
+
+  const totalBlock = document.createElement("div");
+  totalBlock.className = "poster-total";
+
+  const totalLabel = document.createElement("div");
+  totalLabel.className = "poster-total-label";
+  totalLabel.textContent = t("exportTotalLabel");
+
+  const totalValue = document.createElement("div");
+  totalValue.className = "poster-total-value";
+  totalValue.textContent = formatLocaleNumber(summary.total);
+
+  totalBlock.append(totalLabel, totalValue);
+  stats.append(countBlock, totalBlock);
+
+  const date = document.createElement("div");
+  date.className = "poster-date";
+  date.textContent = formatLocaleDate(summary.date);
+
+  poster.append(header, name, imageWrap, stats, date);
+  posterRoot.appendChild(poster);
+  document.body.appendChild(posterRoot);
+
+  await waitForImage(image);
+  if (document.fonts?.ready) {
+    await document.fonts.ready;
+  }
+
+  const canvas = await html2canvas(poster, {
+    useCORS: true,
+    scale: 2,
+    backgroundColor: null
+  });
 
   const link = document.createElement("a");
   const fileBase = summary.title || summary.name || "sticker-summary";
@@ -474,6 +418,7 @@ const exportSummaryImage = async (summary) => {
   document.body.appendChild(link);
   link.click();
   link.remove();
+  posterRoot.remove();
 };
 
 const syncDisplays = (minValue, maxValue) => {
@@ -750,6 +695,8 @@ const renderSummary = (summaryItems) => {
     const image = document.createElement("img");
     image.className = "summary-image";
     image.alt = summary.title || summary.name;
+    image.crossOrigin = "anonymous";
+    image.referrerPolicy = "no-referrer";
     if (summary.image) {
       image.src = summary.image;
     } else {
