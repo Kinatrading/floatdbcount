@@ -153,3 +153,37 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   return true;
 });
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.action !== "fetchSteamImage") {
+    return;
+  }
+
+  const url = message.url;
+  if (
+    typeof url !== "string" ||
+    !url.startsWith("https://community.akamai.steamstatic.com/economy/image/")
+  ) {
+    sendResponse({ ok: false, error: "invalid-url" });
+    return;
+  }
+
+  (async () => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Steam image fetch failed: ${response.status}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      sendResponse({
+        ok: true,
+        arrayBuffer,
+        contentType: response.headers.get("content-type")
+      });
+    } catch (error) {
+      sendResponse({ ok: false, error: error?.message || "fetch-error" });
+    }
+  })();
+
+  return true;
+});
