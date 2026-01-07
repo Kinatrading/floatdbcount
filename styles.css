@@ -321,14 +321,58 @@ button:disabled {
 }
 
 .summary-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 10px;
-  border-radius: 10px;
-  background: #f0f2f8;
+  padding: 16px;
+  border-radius: 16px;
+  overflow: hidden;
+  color: #e8e8f2;
   font-size: 13px;
+  background:
+    radial-gradient(1200px 800px at 50% 35%, rgba(168, 85, 247, 0.22), rgba(0,0,0,0) 60%),
+    radial-gradient(900px 600px at 50% 60%, rgba(59, 130, 246, 0.14), rgba(0,0,0,0) 65%),
+    linear-gradient(180deg, #090a1a 0%, #070817 45%, #050513 100%);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.summary-item::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(
+      closest-side at 50% 42%,
+      rgba(255, 255, 255, 0.1),
+      rgba(168, 85, 247, 0.1),
+      rgba(0, 0, 0, 0) 60%
+    );
+  filter: blur(18px);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.summary-item::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.18) 0 1px, transparent 2px),
+    radial-gradient(circle at 70% 20%, rgba(255,255,255,0.14) 0 1px, transparent 2px),
+    radial-gradient(circle at 45% 65%, rgba(255,255,255,0.1) 0 1px, transparent 2px),
+    radial-gradient(circle at 85% 70%, rgba(255,255,255,0.12) 0 1px, transparent 2px),
+    radial-gradient(circle at 15% 80%, rgba(255,255,255,0.1) 0 1px, transparent 2px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.summary-item > * {
+  position: relative;
+  z-index: 1;
 }
 
 .summary-content {
@@ -346,16 +390,15 @@ button:disabled {
 }
 
 .summary-image {
-  width: 84px;
-  height: 84px;
+  width: 220px;
+  height: 220px;
   object-fit: contain;
   border-radius: 12px;
-  background: radial-gradient(circle at top, #f8fafc, #e2e8f0);
-  padding: 8px;
+  background: transparent;
 }
 
 .summary-image.is-empty {
-  background: #e2e8f0;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .summary-export {
@@ -659,15 +702,15 @@ button:disabled {
   }
 
   .summary-item {
-    background: #232838;
+    color: #e8e8f2;
   }
 
   .summary-image {
-    background: radial-gradient(circle at top, #1f2937, #0f172a);
+    background: transparent;
   }
 
   .summary-image.is-empty {
-    background: #1f2937;
+    background: rgba(255, 255, 255, 0.08);
   }
 }
 
@@ -680,6 +723,11 @@ button:disabled {
   .summary-aside {
     flex-direction: row;
     justify-content: space-between;
+  }
+
+  .summary-image {
+    width: 160px;
+    height: 160px;
   }
 
   .summary-export {
