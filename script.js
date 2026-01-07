@@ -1,3 +1,5 @@
+import html2canvas from "./html2canvas.esm.js";
+
 const categoryCheckboxes = Array.from(
   document.querySelectorAll('input[name="category"]')
 );
@@ -324,6 +326,31 @@ const waitForImage = (image) =>
     image.onerror = () => resolve();
   });
 
+const isSteamImageUrl = (url) =>
+  typeof url === "string" &&
+  url.startsWith("https://community.akamai.steamstatic.com/economy/image/");
+
+const fetchSteamImageBlob = (url) =>
+  new Promise((resolve) => {
+    if (!url || typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+      resolve(null);
+      return;
+    }
+
+    chrome.runtime.sendMessage({ action: "fetchSteamImage", url }, (response) => {
+      if (chrome.runtime.lastError || !response?.ok || !response.arrayBuffer) {
+        resolve(null);
+        return;
+      }
+
+      resolve(
+        new Blob([response.arrayBuffer], {
+          type: response.contentType || "image/png"
+        })
+      );
+    });
+  });
+
 const exportSummaryImage = async (summary) => {
   if (typeof html2canvas === "undefined") {
     return;
@@ -351,7 +378,16 @@ const exportSummaryImage = async (summary) => {
   image.alt = summary.title || summary.name;
   image.crossOrigin = "anonymous";
   image.referrerPolicy = "no-referrer";
-  image.src = summary.image || "";
+  let posterImageUrl = summary.image || "";
+  let blobUrl = null;
+  if (isSteamImageUrl(posterImageUrl)) {
+    const blob = await fetchSteamImageBlob(posterImageUrl);
+    if (blob) {
+      blobUrl = URL.createObjectURL(blob);
+      posterImageUrl = blobUrl;
+    }
+  }
+  image.src = posterImageUrl;
   imageWrap.appendChild(image);
 
   const stats = document.createElement("div");
@@ -405,20 +441,26 @@ const exportSummaryImage = async (summary) => {
     await document.fonts.ready;
   }
 
-  const canvas = await html2canvas(poster, {
-    useCORS: true,
-    scale: 2,
-    backgroundColor: null
-  });
+  try {
+    const canvas = await html2canvas(poster, {
+      useCORS: true,
+      scale: 2,
+      backgroundColor: null
+    });
 
-  const link = document.createElement("a");
-  const fileBase = summary.title || summary.name || "sticker-summary";
-  link.download = `${sanitizeFileName(fileBase)}.png`;
-  link.href = canvas.toDataURL("image/png");
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  posterRoot.remove();
+    const link = document.createElement("a");
+    const fileBase = summary.title || summary.name || "sticker-summary";
+    link.download = `${sanitizeFileName(fileBase)}.png`;
+    link.href = canvas.toDataURL("image/png");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    if (blobUrl) {
+      URL.revokeObjectURL(blobUrl);
+    }
+    posterRoot.remove();
+  }
 };
 
 const syncDisplays = (minValue, maxValue) => {
