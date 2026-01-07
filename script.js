@@ -11,6 +11,7 @@ const stickerIdInput = document.getElementById("sticker-id");
 const runBtn = document.getElementById("run-btn");
 const generatedLink = document.getElementById("generated-link");
 const resultsList = document.getElementById("results-list");
+const totalStickers = document.getElementById("total-stickers");
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -144,6 +145,37 @@ const renderResults = (items) => {
   });
 };
 
+const parseItemsFoundCount = (text) => {
+  if (!text) {
+    return null;
+  }
+  const match = text.match(/([\d,.\s]+)\s+Items\s+Found/i);
+  if (!match) {
+    return null;
+  }
+  const value = parseInt(match[1].replace(/[^\d]/g, ""), 10);
+  return Number.isFinite(value) ? value : null;
+};
+
+const updateTotalStickers = (items) => {
+  const counts = items.map((item) => parseItemsFoundCount(item.found));
+  if (counts.some((count) => count === null)) {
+    totalStickers.textContent = "—";
+    return;
+  }
+
+  const pureCounts = [
+    counts[0] - counts[1],
+    counts[1] - counts[2],
+    counts[2] - counts[3],
+    counts[3] - counts[4],
+    counts[4]
+  ];
+
+  const total = pureCounts.reduce((sum, value, index) => sum + value * (index + 1), 0);
+  totalStickers.textContent = total.toLocaleString();
+};
+
 runBtn.addEventListener("click", () => {
   const stickerId = stickerIdInput.value.trim();
   if (!stickerId) {
@@ -159,6 +191,7 @@ runBtn.addEventListener("click", () => {
   generatedLink.href = urls[0].url;
   generatedLink.textContent = urls[0].url;
   renderResults(urls.map((item) => ({ ...item, found: null, loading: true })));
+  totalStickers.textContent = "—";
 
   runBtn.disabled = true;
   chrome.runtime.sendMessage({ action: "runCounts", urls: urls.map((u) => u.url) }, (response) => {
@@ -175,6 +208,7 @@ runBtn.addEventListener("click", () => {
       loading: false
     }));
     renderResults(results);
+    updateTotalStickers(results);
   });
 });
 

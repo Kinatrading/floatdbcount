@@ -165,6 +165,11 @@ button:hover {
   color: #4b5262;
 }
 
+.total-output strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     background-color: #0f1117;
@@ -212,5 +217,9 @@ button:hover {
 
   .result-meta {
     color: #a6adbd;
+  }
+
+  .total-output strong {
+    color: #e8eaf0;
   }
 }
