@@ -21,10 +21,222 @@ const stopBtn = document.getElementById("stop-btn");
 const generatedLink = document.getElementById("generated-link");
 const resultsList = document.getElementById("results-list");
 const summaryList = document.getElementById("summary-list");
+const progressBar = document.getElementById("progress-bar");
+const progressMeta = document.getElementById("progress-meta");
+const downloadCsvButton = document.getElementById("download-csv");
+const languageSelect = document.getElementById("language-select");
+
+const translations = {
+  uk: {
+    title: "CSFloat DB Sticker Linker created by Kina",
+    subtitle: "Згенеруйте посилання для пошуку скінів по наліпках та float.",
+    language: "Мова",
+    categoryTitle: "Категорія предметів",
+    categoryAll: "Усі",
+    categoryAria: "Категорія",
+    floatTitle: "Діапазон float",
+    minFloatAria: "Мінімальний float",
+    maxFloatAria: "Максимальний float",
+    minLabel: "Мінімум",
+    maxLabel: "Максимум",
+    stickersTitle: "Наліпки",
+    gradeLabel: "Грейд:",
+    gradeAria: "Грейд наліпок",
+    gradeAll: "Усі",
+    stickerSearch: "Пошук наліпки",
+    stickerSearchPlaceholder: "Sticker | Fearsome",
+    collectionSearch: "Пошук колекції",
+    collectionSearchPlaceholder: "Sticker Capsule",
+    selectedStickers: "Обрані наліпки:",
+    clearAll: "Видалити всі",
+    run: "Run",
+    stop: "Stop",
+    progressLabel: "Прогрес обробки:",
+    generatedLink: "Згенероване посилання:",
+    resultsLabel: "Посилання та кількість:",
+    summaryLabel: "Збережений підсумок:",
+    downloadCsv: "Завантажити CSV",
+    resultsTitle: "Результати",
+    waiting: "Очікування...",
+    notFound: "Не знайдено",
+    totalStickersLabel: "Загальна кількість поклеєних стікерів:",
+    summaryEmpty: "Підсумок буде доступний після запуску.",
+    selectedEmpty: "Наліпки не обрані.",
+    remove: "Видалити",
+    alertSelect: "Оберіть хоча б одну наліпку.",
+    summaryCountsLabel: "1х: {c1}, 2х: {c2}, 3х: {c3}, 4х: {c4}, 5х: {c5}",
+    summaryTotalLabel: "Сумарна кількість поклеєних: {total}",
+    summaryDateLabel: "Дата: {date}",
+    progressMeta: "{current} / {total}",
+    downloadCsvName: "sticker-summary.csv",
+    csvStickerHeader: "Наліпка"
+  },
+  en: {
+    title: "CSFloat DB Sticker Linker created by Kina",
+    subtitle: "Generate links to search skins by stickers and float range.",
+    language: "Language",
+    categoryTitle: "Item category",
+    categoryAll: "All",
+    categoryAria: "Category",
+    floatTitle: "Float range",
+    minFloatAria: "Minimum float",
+    maxFloatAria: "Maximum float",
+    minLabel: "Minimum",
+    maxLabel: "Maximum",
+    stickersTitle: "Stickers",
+    gradeLabel: "Grade:",
+    gradeAria: "Sticker grade",
+    gradeAll: "All",
+    stickerSearch: "Sticker search",
+    stickerSearchPlaceholder: "Sticker | Fearsome",
+    collectionSearch: "Collection search",
+    collectionSearchPlaceholder: "Sticker Capsule",
+    selectedStickers: "Selected stickers:",
+    clearAll: "Clear all",
+    run: "Run",
+    stop: "Stop",
+    progressLabel: "Processing progress:",
+    generatedLink: "Generated link:",
+    resultsLabel: "Links and count:",
+    summaryLabel: "Saved summary:",
+    downloadCsv: "Download CSV",
+    resultsTitle: "Results",
+    waiting: "Waiting...",
+    notFound: "Not found",
+    totalStickersLabel: "Total applied stickers:",
+    summaryEmpty: "Summary will be available after running.",
+    selectedEmpty: "No stickers selected.",
+    remove: "Remove",
+    alertSelect: "Select at least one sticker.",
+    summaryCountsLabel: "1x: {c1}, 2x: {c2}, 3x: {c3}, 4x: {c4}, 5x: {c5}",
+    summaryTotalLabel: "Total applied: {total}",
+    summaryDateLabel: "Date: {date}",
+    progressMeta: "{current} / {total}",
+    downloadCsvName: "sticker-summary.csv",
+    csvStickerHeader: "Sticker"
+  }
+};
+
+let currentLanguage = "uk";
+let summaryItems = [];
+let progressTotal = 0;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 const formatFloat = (value) => Number(value).toFixed(6);
+
+const t = (key) => translations[currentLanguage]?.[key] ?? key;
+
+const formatLocaleNumber = (value) =>
+  Number(value).toLocaleString(currentLanguage === "uk" ? "uk-UA" : "en-US");
+
+const formatCountLabel = (count) =>
+  currentLanguage === "uk" ? `${count} наліпки` : `${count} stickers`;
+
+const formatLocaleDate = (value) =>
+  new Date(value).toLocaleString(currentLanguage === "uk" ? "uk-UA" : "en-US");
+
+const applyTranslations = () => {
+  document.documentElement.lang = currentLanguage;
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    const key = element.dataset.i18n;
+    if (key && t(key)) {
+      element.textContent = t(key);
+    }
+  });
+
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+    const key = element.dataset.i18nPlaceholder;
+    if (key && t(key)) {
+      element.setAttribute("placeholder", t(key));
+    }
+  });
+
+  document.querySelectorAll("[data-i18n-aria]").forEach((element) => {
+    const key = element.dataset.i18nAria;
+    if (key && t(key)) {
+      element.setAttribute("aria-label", t(key));
+    }
+  });
+
+  if (languageSelect) {
+    languageSelect.value = currentLanguage;
+  }
+
+  updateProgress(0, progressTotal);
+  renderSelectedStickers([...selectedStickerMap.values()]);
+  renderSummary(summaryItems);
+};
+
+const updateProgress = (current, total) => {
+  const safeTotal = Math.max(total, 0);
+  const safeCurrent = Math.min(Math.max(current, 0), safeTotal);
+  const percent = safeTotal === 0 ? 0 : (safeCurrent / safeTotal) * 100;
+  progressBar.style.width = `${percent}%`;
+  progressBar.setAttribute("aria-valuenow", Math.round(percent));
+  progressMeta.textContent = t("progressMeta")
+    .replace("{current}", safeCurrent)
+    .replace("{total}", safeTotal);
+};
+
+const initCardToggles = () => {
+  document.querySelectorAll(".card").forEach((card) => {
+    const heading = card.querySelector("h2");
+    const content = card.querySelector(".card-content");
+    if (!heading || !content) {
+      return;
+    }
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "card-toggle";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = "▸";
+    heading.appendChild(toggle);
+    card.classList.add("is-collapsed");
+    toggle.addEventListener("click", () => {
+      const isCollapsed = card.classList.toggle("is-collapsed");
+      toggle.textContent = isCollapsed ? "▸" : "▾";
+      toggle.setAttribute("aria-expanded", String(!isCollapsed));
+    });
+  });
+};
+
+const escapeCsvValue = (value) => {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  const stringValue = String(value);
+  if (/[",\n]/.test(stringValue)) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
+};
+
+const buildCsv = (items) => {
+  const headers = [
+    t("csvStickerHeader"),
+    "1x",
+    "2x",
+    "3x",
+    "4x",
+    "5x",
+    t("summaryTotalLabel").replace("{total}", "").trim(),
+    t("summaryDateLabel").replace("{date}", "").trim()
+  ];
+  const rows = items.map((item) => [
+    item.name,
+    item.pureCounts[0],
+    item.pureCounts[1],
+    item.pureCounts[2],
+    item.pureCounts[3],
+    item.pureCounts[4],
+    item.total,
+    formatLocaleDate(item.date)
+  ]);
+  return [headers, ...rows]
+    .map((row) => row.map(escapeCsvValue).join(","))
+    .join("\n");
+};
 
 const syncDisplays = (minValue, maxValue) => {
   minDisplay.textContent = formatFloat(minValue);
@@ -218,12 +430,12 @@ const renderStickerResults = (sticker, items) => {
     const meta = document.createElement("div");
     meta.className = "result-meta";
     const countLabel = document.createElement("span");
-    countLabel.textContent = `${item.count} наліпки`;
+    countLabel.textContent = formatCountLabel(item.count);
     const valueLabel = document.createElement("span");
     if (item.loading) {
-      valueLabel.textContent = "Очікування...";
+      valueLabel.textContent = t("waiting");
     } else if (item.found === null) {
-      valueLabel.textContent = "Не знайдено";
+      valueLabel.textContent = t("notFound");
     } else {
       valueLabel.textContent = item.found;
     }
@@ -244,8 +456,8 @@ const renderStickerResults = (sticker, items) => {
   totalLabel.className = "sticker-total";
   totalLabel.textContent =
     total === null
-      ? "Загальна кількість поклеєних стікерів: —"
-      : `Загальна кількість поклеєних стікерів: ${total.toLocaleString()}`;
+      ? `${t("totalStickersLabel")} —`
+      : `${t("totalStickersLabel")} ${formatLocaleNumber(total)}`;
   block.appendChild(totalLabel);
 
   resultsList.appendChild(block);
@@ -253,10 +465,11 @@ const renderStickerResults = (sticker, items) => {
 
 const renderSummary = (summaryItems) => {
   summaryList.innerHTML = "";
+  downloadCsvButton.disabled = summaryItems.length === 0;
   if (summaryItems.length === 0) {
     const empty = document.createElement("div");
     empty.className = "summary-item";
-    empty.textContent = "Підсумок буде доступний після запуску.";
+    empty.textContent = t("summaryEmpty");
     summaryList.appendChild(empty);
     return;
   }
@@ -269,13 +482,24 @@ const renderSummary = (summaryItems) => {
     title.textContent = summary.name;
 
     const counts = document.createElement("div");
-    counts.textContent = `1х: ${summary.pureCounts[0]}, 2х: ${summary.pureCounts[1]}, 3х: ${summary.pureCounts[2]}, 4х: ${summary.pureCounts[3]}, 5х: ${summary.pureCounts[4]}`;
+    counts.textContent = t("summaryCountsLabel")
+      .replace("{c1}", formatLocaleNumber(summary.pureCounts[0]))
+      .replace("{c2}", formatLocaleNumber(summary.pureCounts[1]))
+      .replace("{c3}", formatLocaleNumber(summary.pureCounts[2]))
+      .replace("{c4}", formatLocaleNumber(summary.pureCounts[3]))
+      .replace("{c5}", formatLocaleNumber(summary.pureCounts[4]));
 
     const total = document.createElement("div");
-    total.textContent = `Сумарна кількість поклеєних: ${summary.total}`;
+    total.textContent = t("summaryTotalLabel").replace(
+      "{total}",
+      formatLocaleNumber(summary.total)
+    );
 
     const date = document.createElement("div");
-    date.textContent = `Дата: ${summary.date}`;
+    date.textContent = t("summaryDateLabel").replace(
+      "{date}",
+      formatLocaleDate(summary.date)
+    );
 
     item.append(title, counts, total, date);
     summaryList.appendChild(item);
@@ -287,7 +511,7 @@ const renderSelectedStickers = (stickers) => {
   if (stickers.length === 0) {
     const empty = document.createElement("li");
     empty.className = "selected-item";
-    empty.textContent = "Наліпки не обрані.";
+    empty.textContent = t("selectedEmpty");
     selectedStickersList.appendChild(empty);
     return;
   }
@@ -299,7 +523,7 @@ const renderSelectedStickers = (stickers) => {
     label.textContent = `${sticker.name} (${sticker.def_index})`;
     const remove = document.createElement("button");
     remove.type = "button";
-    remove.textContent = "Видалити";
+    remove.textContent = t("remove");
     remove.addEventListener("click", () => {
       selectedStickerMap.delete(sticker.def_index);
       renderSelectedStickers([...selectedStickerMap.values()]);
@@ -431,6 +655,27 @@ clearStickersButton.addEventListener("click", () => {
   renderSelectedStickers([]);
 });
 
+downloadCsvButton.addEventListener("click", () => {
+  if (summaryItems.length === 0) {
+    return;
+  }
+  const csv = buildCsv(summaryItems);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = t("downloadCsvName");
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+});
+
+languageSelect.addEventListener("change", (event) => {
+  currentLanguage = event.target.value;
+  applyTranslations();
+});
+
 const loadStickerData = async () => {
   try {
     const url =
@@ -465,7 +710,7 @@ const loadStickerData = async () => {
 runBtn.addEventListener("click", () => {
   const selectedStickers = [...selectedStickerMap.values()];
   if (selectedStickers.length === 0) {
-    alert("Оберіть хоча б одну наліпку.");
+    alert(t("alertSelect"));
     return;
   }
 
@@ -473,6 +718,10 @@ runBtn.addEventListener("click", () => {
   summaryList.innerHTML = "";
   generatedLink.href = "#";
   generatedLink.textContent = "—";
+  summaryItems = [];
+  progressTotal = selectedStickers.length;
+  updateProgress(0, progressTotal);
+  downloadCsvButton.disabled = true;
   runBtn.disabled = true;
   stopBtn.disabled = false;
   let stopRequested = false;
@@ -480,7 +729,7 @@ runBtn.addEventListener("click", () => {
     stopRequested = true;
     stopBtn.disabled = true;
   };
-  const summaryItems = [];
+  let processed = 0;
   const runSequential = async () => {
     for (const sticker of selectedStickers) {
       if (stopRequested) {
@@ -515,6 +764,8 @@ runBtn.addEventListener("click", () => {
           sticker,
           urls.map((item) => ({ ...item, found: null, loading: false }))
         );
+        processed += 1;
+        updateProgress(processed, progressTotal);
         continue;
       }
 
@@ -530,13 +781,14 @@ runBtn.addEventListener("click", () => {
       if (totals) {
         summaryItems.push({
           name: `${sticker.name} (${sticker.def_index})`,
-          pureCounts: totals.pureCounts.map((value, index) =>
-            (value * (index + 1)).toLocaleString()
-          ),
-          total: totals.total.toLocaleString(),
-          date: new Date().toLocaleString()
+          pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
+          total: totals.total,
+          date: new Date().toISOString()
         });
       }
+
+      processed += 1;
+      updateProgress(processed, progressTotal);
     }
   };
 
@@ -544,9 +796,11 @@ runBtn.addEventListener("click", () => {
     runBtn.disabled = false;
     stopBtn.disabled = true;
     renderSummary(summaryItems);
+    downloadCsvButton.disabled = summaryItems.length === 0;
   });
 });
 
 syncInputs(0, 1);
+initCardToggles();
 loadStickerData();
-renderSummary([]);
+applyTranslations();

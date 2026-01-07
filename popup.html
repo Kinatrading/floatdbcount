@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSFloat Rate Limit</title>
+    <style>
+      body {
+        font-family: "Inter", "Segoe UI", sans-serif;
+        font-size: 13px;
+        margin: 0;
+        padding: 12px;
+        min-width: 220px;
+        color: #1b1e28;
+        background: #f6f7fb;
+      }
+
+      h1 {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+
+      .label {
+        color: #4b5262;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CSFloat rate limit</h1>
+    <div class="row">
+      <span class="label">Limit</span>
+      <span id="rate-limit">n/a</span>
+    </div>
+    <div class="row">
+      <span class="label">Remaining</span>
+      <span id="rate-remaining">n/a</span>
+    </div>
+    <div class="row">
+      <span class="label">Reset in</span>
+      <span id="rate-reset">n/a</span>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

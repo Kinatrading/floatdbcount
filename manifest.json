@@ -3,10 +3,11 @@
   "name": "CSFloat DB Sticker Linker created by Kina",
   "version": "0.1.0",
   "description": "Generate CSFloat DB links by sticker and float range.",
-  "permissions": ["tabs", "scripting"],
-  "host_permissions": ["https://csfloat.com/*"],
+  "permissions": ["tabs", "scripting", "webRequest", "storage"],
+  "host_permissions": ["*://csfloat.com/*"],
   "action": {
-    "default_title": "CSFloat DB Sticker Linker"
+    "default_title": "CSFloat DB Sticker Linker",
+    "default_popup": "popup.html"
   },
   "background": {
     "service_worker": "background.js"
