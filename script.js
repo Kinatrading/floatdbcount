@@ -280,6 +280,17 @@ const stickerMatchesRarity = (sticker) => {
   return sticker.rarity?.name === rarity;
 };
 
+const getStickerSearchHaystack = (sticker) => {
+  return [
+    sticker.name,
+    sticker.market_hash_name,
+    sticker.def_index,
+    sticker.id
+  ]
+    .filter(Boolean)
+    .map((value) => normalizeValue(String(value)));
+};
+
 const updateStickerSuggestions = () => {
   const query = normalizeValue(stickerSearchInput.value);
   stickerSuggestions.innerHTML = "";
@@ -289,7 +300,9 @@ const updateStickerSuggestions = () => {
 
   const matches = stickersData
     .filter((sticker) => stickerMatchesRarity(sticker))
-    .filter((sticker) => normalizeValue(sticker.name).includes(query))
+    .filter((sticker) =>
+      getStickerSearchHaystack(sticker).some((value) => value.includes(query))
+    )
     .slice(0, 8);
 
   matches.forEach((sticker) => {
@@ -360,7 +373,11 @@ collectionSearchInput.addEventListener("input", updateCollectionSuggestions);
 
 const loadStickerData = async () => {
   try {
-    const response = await fetch("stickers.json");
+    const url =
+      typeof chrome !== "undefined" && chrome.runtime?.getURL
+        ? chrome.runtime.getURL("stickers.json")
+        : "stickers.json";
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error("Failed to load stickers.json");
     }
