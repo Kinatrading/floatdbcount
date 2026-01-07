@@ -57,6 +57,9 @@ const translations = {
     resultsLabel: "Посилання та кількість:",
     summaryLabel: "Збережений підсумок:",
     downloadCsv: "Завантажити CSV",
+    exportImage: "Експорт картинки",
+    exportTitle: "CS2 STICKER HIGHLIGHT",
+    exportTotalLabel: "ЗАГАЛЬНО ПОКЛЕЄНО",
     resultsTitle: "Результати",
     waiting: "Очікування...",
     notFound: "Не знайдено",
@@ -102,6 +105,9 @@ const translations = {
     resultsLabel: "Links and count:",
     summaryLabel: "Saved summary:",
     downloadCsv: "Download CSV",
+    exportImage: "Export image",
+    exportTitle: "CS2 STICKER HIGHLIGHT",
+    exportTotalLabel: "TOTAL POOLS",
     resultsTitle: "Results",
     waiting: "Waiting...",
     notFound: "Not found",
@@ -299,6 +305,175 @@ const buildCsv = (items) => {
   return [headers, ...rows]
     .map((row) => row.map(escapeCsvValue).join(","))
     .join("\n");
+};
+
+const sanitizeFileName = (value) =>
+  String(value).replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
+
+const loadImage = (url) =>
+  new Promise((resolve) => {
+    if (!url) {
+      resolve(null);
+      return;
+    }
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = url;
+  });
+
+const drawRoundedRect = (ctx, x, y, width, height, radius) => {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+};
+
+const drawWrappedText = (ctx, text, x, y, maxWidth, lineHeight) => {
+  const words = String(text).split(" ");
+  let line = "";
+  let currentY = y;
+  words.forEach((word, index) => {
+    const testLine = line ? `${line} ${word}` : word;
+    const { width } = ctx.measureText(testLine);
+    if (width > maxWidth && line) {
+      ctx.fillText(line, x, currentY);
+      line = word;
+      currentY += lineHeight;
+    } else {
+      line = testLine;
+    }
+    if (index === words.length - 1) {
+      ctx.fillText(line, x, currentY);
+    }
+  });
+  return currentY;
+};
+
+const exportSummaryImage = async (summary) => {
+  const size = 900;
+  const scale = 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = size * scale;
+  canvas.height = size * scale;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return;
+  }
+  ctx.scale(scale, scale);
+
+  const gradient = ctx.createLinearGradient(0, 0, size, size);
+  gradient.addColorStop(0, "#0b0a1d");
+  gradient.addColorStop(0.5, "#1b1035");
+  gradient.addColorStop(1, "#0d0a22");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  for (let i = 0; i < 60; i += 1) {
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.beginPath();
+    ctx.arc(
+      Math.random() * size,
+      Math.random() * size,
+      Math.random() * 2 + 1,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
+
+  const panelPadding = 36;
+  const panelX = panelPadding;
+  const panelY = panelPadding;
+  const panelSize = size - panelPadding * 2;
+  drawRoundedRect(ctx, panelX, panelY, panelSize, panelSize, 32);
+  ctx.fillStyle = "rgba(10, 13, 30, 0.75)";
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = "600 20px Inter, sans-serif";
+  ctx.fillText(t("exportTitle"), size / 2, panelY + 48);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 36px Inter, sans-serif";
+  const titleMaxWidth = panelSize - 120;
+  const titleY = panelY + 100;
+  drawWrappedText(ctx, summary.title || summary.name, size / 2, titleY, titleMaxWidth, 42);
+
+  const image = await loadImage(summary.image);
+  if (image) {
+    const imageSize = 260;
+    const imageX = size / 2 - imageSize / 2;
+    const imageY = panelY + 170;
+    ctx.shadowColor = "rgba(255, 255, 255, 0.2)";
+    ctx.shadowBlur = 20;
+    ctx.drawImage(image, imageX, imageY, imageSize, imageSize);
+    ctx.shadowBlur = 0;
+  }
+
+  const counts = summary.pureCounts || [];
+  const countX = panelX + 80;
+  const countY = panelY + 470;
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 32px Inter, sans-serif";
+  ctx.fillText(
+    `1 / ${formatLocaleNumber(counts[0] || 0)}`,
+    countX,
+    countY
+  );
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.font = "600 20px Inter, sans-serif";
+  ctx.fillText(
+    `2 / ${formatLocaleNumber(counts[1] || 0)} - 3 / ${formatLocaleNumber(
+      counts[2] || 0
+    )}`,
+    countX,
+    countY + 36
+  );
+  ctx.fillText(
+    `4 / ${formatLocaleNumber(counts[3] || 0)} - 5 / ${formatLocaleNumber(
+      counts[4] || 0
+    )}`,
+    countX,
+    countY + 66
+  );
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = "600 18px Inter, sans-serif";
+  ctx.fillText(t("exportTotalLabel"), panelX + panelSize - 80, countY);
+
+  ctx.fillStyle = "#facc15";
+  ctx.font = "800 48px Inter, sans-serif";
+  ctx.fillText(formatLocaleNumber(summary.total), panelX + panelSize - 80, countY + 52);
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = "500 18px Inter, sans-serif";
+  ctx.fillText(
+    formatLocaleDate(summary.date),
+    size / 2,
+    panelY + panelSize - 32
+  );
+
+  const link = document.createElement("a");
+  const fileBase = summary.title || summary.name || "sticker-summary";
+  link.download = `${sanitizeFileName(fileBase)}.png`;
+  link.href = canvas.toDataURL("image/png");
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 };
 
 const syncDisplays = (minValue, maxValue) => {
@@ -541,6 +716,9 @@ const renderSummary = (summaryItems) => {
     const item = document.createElement("div");
     item.className = "summary-item";
 
+    const content = document.createElement("div");
+    content.className = "summary-content";
+
     const title = document.createElement("strong");
     title.textContent = summary.name;
 
@@ -564,7 +742,30 @@ const renderSummary = (summaryItems) => {
       formatLocaleDate(summary.date)
     );
 
-    item.append(title, counts, total, date);
+    content.append(title, counts, total, date);
+
+    const aside = document.createElement("div");
+    aside.className = "summary-aside";
+
+    const image = document.createElement("img");
+    image.className = "summary-image";
+    image.alt = summary.title || summary.name;
+    if (summary.image) {
+      image.src = summary.image;
+    } else {
+      image.classList.add("is-empty");
+    }
+
+    const exportButton = document.createElement("button");
+    exportButton.type = "button";
+    exportButton.className = "secondary-button summary-export";
+    exportButton.textContent = t("exportImage");
+    exportButton.addEventListener("click", () => {
+      exportSummaryImage(summary);
+    });
+
+    aside.append(image, exportButton);
+    item.append(content, aside);
     summaryList.appendChild(item);
   });
 };
@@ -741,15 +942,21 @@ languageSelect.addEventListener("change", (event) => {
 
 const loadStickerData = async () => {
   try {
-    const url =
+    const buildUrl = (name) =>
       typeof chrome !== "undefined" && chrome.runtime?.getURL
-        ? chrome.runtime.getURL("stickers_clean.json")
-        : "stickers_clean.json";
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error("Failed to load stickers.json");
+        ? chrome.runtime.getURL(name)
+        : name;
+    const response = await fetch(buildUrl("stickers_clean.json"));
+    let data = null;
+    if (response.ok) {
+      data = await response.json();
+    } else {
+      const fallbackResponse = await fetch(buildUrl("stickers.clean.json"));
+      if (!fallbackResponse.ok) {
+        throw new Error("Failed to load stickers.json");
+      }
+      data = await fallbackResponse.json();
     }
-    const data = await response.json();
     if (!Array.isArray(data)) {
       throw new Error("Invalid sticker data");
     }
@@ -865,6 +1072,9 @@ runBtn.addEventListener("click", () => {
       if (totals) {
         summaryItems.push({
           name: `${sticker.name} (${sticker.def_index})`,
+          title: sticker.name,
+          defIndex: sticker.def_index,
+          image: sticker.image,
           pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
           total: totals.total,
           date: new Date().toISOString()
