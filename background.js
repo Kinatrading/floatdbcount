@@ -9,10 +9,16 @@ const waitForCountInTab = async (tabId) => {
     target: { tabId },
     func: () => {
       return new Promise((resolve) => {
+        const isValidCount = (text) =>
+          text &&
+          /Items\s*Found/i.test(text) &&
+          !/NaN/i.test(text) &&
+          /[0-9]/.test(text);
+
         const existing = document.querySelector(".count");
         if (existing) {
           const text = existing.textContent?.trim();
-          if (text) {
+          if (isValidCount(text)) {
             resolve(text);
             return;
           }
@@ -33,7 +39,7 @@ const waitForCountInTab = async (tabId) => {
             return;
           }
           const text = element.textContent?.trim();
-          if (text) {
+          if (isValidCount(text)) {
             clearTimeout(timeout);
             observer.disconnect();
             resolve(text);
