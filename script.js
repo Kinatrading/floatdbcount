@@ -186,6 +186,15 @@ const computePureCounts = (items) => {
   ];
 };
 
+const computeStickerTotals = (items) => {
+  const pureCounts = computePureCounts(items);
+  if (!pureCounts) {
+    return null;
+  }
+  const total = pureCounts.reduce((sum, value, index) => sum + value * (index + 1), 0);
+  return { pureCounts, total };
+};
+
 const renderStickerResults = (sticker, items) => {
   const existing = resultsList.querySelector(
     `[data-sticker-id="${sticker.def_index}"]`
@@ -517,13 +526,14 @@ runBtn.addEventListener("click", () => {
       }));
       renderStickerResults(sticker, results);
 
-      const pureCounts = computePureCounts(results);
-      const total = computeTotalStickers(results);
-      if (pureCounts && total !== null) {
+      const totals = computeStickerTotals(results);
+      if (totals) {
         summaryItems.push({
           name: `${sticker.name} (${sticker.def_index})`,
-          pureCounts: pureCounts.map((value) => value.toLocaleString()),
-          total: total.toLocaleString(),
+          pureCounts: totals.pureCounts.map((value, index) =>
+            (value * (index + 1)).toLocaleString()
+          ),
+          total: totals.total.toLocaleString(),
           date: new Date().toLocaleString()
         });
       }
