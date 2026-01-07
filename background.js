@@ -8,59 +8,54 @@ const waitForCountInTab = async (tabId) => {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => {
-      return new Promise((resolve) => {
-        const isValidCount = (text) =>
-          text &&
-          /Items\s*Found/i.test(text) &&
-          !/NaN/i.test(text) &&
-          /[0-9]/.test(text);
+      const waitForItemsFound = ({
+        selector,
+        intervalMs = 500,
+        timeoutMs = 120000,
+        stableChecks = 2
+      } = {}) => {
+        return new Promise((resolve, reject) => {
+          const started = Date.now();
+          let lastValue = null;
+          let stableCount = 0;
 
-        const getCountText = () =>
-          document.querySelector(".count")?.textContent?.trim() ?? null;
-
-        let observer;
-        let intervalId;
-
-        const timeout = setTimeout(() => {
-          if (observer) {
-            observer.disconnect();
-          }
-          if (intervalId) {
-            clearInterval(intervalId);
-          }
-          resolve(null);
-        }, 120000);
-
-        const checkAndResolve = () => {
-          const text = getCountText();
-          if (isValidCount(text)) {
-            clearTimeout(timeout);
-            if (observer) {
-              observer.disconnect();
+          const timer = setInterval(() => {
+            const el = document.querySelector(selector);
+            if (!el) {
+              if (Date.now() - started > timeoutMs) {
+                clearInterval(timer);
+                reject(new Error("Timeout: count element not found"));
+              }
+              return;
             }
-            if (intervalId) {
-              clearInterval(intervalId);
+
+            const text = (el.textContent || "").trim();
+            const match = text.match(/^([\d,.\s]+)\s+Items\s+Found$/i);
+            if (!match) {
+              return;
             }
-            resolve(text);
-          }
-        };
 
-        checkAndResolve();
+            const value = parseInt(match[1].replace(/[^\d]/g, ""), 10);
+            if (!Number.isFinite(value)) {
+              return;
+            }
 
-        intervalId = setInterval(checkAndResolve, 1000);
+            if (value === lastValue) {
+              stableCount += 1;
+            } else {
+              lastValue = value;
+              stableCount = 1;
+            }
 
-        observer = new MutationObserver(checkAndResolve);
-        // CSFloat often updates the "Items Found" text by changing an existing text node,
-        // which does NOT trigger childList mutations. Watch characterData/attributes too.
-        observer.observe(document.body, {
-          childList: true,
-          subtree: true,
-          characterData: true,
-          attributes: true
+            if (stableCount >= stableChecks) {
+              clearInterval(timer);
+              resolve(`${value.toLocaleString()} Items Found`);
+            }
+          }, intervalMs);
         });
+      };
 
-        window.addEventListener("load", checkAndResolve, { once: true });
-      });
+      return waitForItemsFound({ selector: ".count" }).catch(() => null);
     }
   });
 
