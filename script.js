@@ -315,6 +315,14 @@ const updateStickerSuggestions = () => {
   });
 };
 
+const stickerHasCollection = (sticker, collection) => {
+  const inCrates = sticker.crates?.some((crate) => crate.name === collection);
+  const inCollections = sticker.collections?.some(
+    (entry) => entry.name === collection
+  );
+  return Boolean(inCrates || inCollections);
+};
+
 const updateCollectionSuggestions = () => {
   const query = normalizeValue(collectionSearchInput.value);
   collectionSuggestions.innerHTML = "";
@@ -345,10 +353,7 @@ const addCollectionStickers = (collection) => {
   const rarities = getActiveRarities();
   stickersData
     .filter((sticker) => {
-      const hasCollection = sticker.crates?.some(
-        (crate) => crate.name === collection
-      );
-      if (!hasCollection) {
+      if (!stickerHasCollection(sticker, collection)) {
         return false;
       }
       if (rarities.length === 0) {
@@ -382,9 +387,10 @@ const loadStickerData = async () => {
     stickersData = data;
     collectionsData = Array.from(
       new Set(
-        data.flatMap((sticker) =>
-          (sticker.crates || []).map((crate) => crate.name)
-        )
+        data.flatMap((sticker) => [
+          ...(sticker.crates || []).map((crate) => crate.name),
+          ...(sticker.collections || []).map((collection) => collection.name)
+        ])
       )
     ).sort();
   } catch (error) {
