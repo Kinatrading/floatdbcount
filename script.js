@@ -129,7 +129,7 @@ const renderResults = (items) => {
     } else if (item.found === null) {
       valueLabel.textContent = "Не знайдено";
     } else {
-      valueLabel.textContent = `${item.found} Items Found`;
+      valueLabel.textContent = item.found;
     }
     meta.append(countLabel, valueLabel);
 

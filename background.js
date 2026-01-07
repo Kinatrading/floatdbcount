@@ -8,20 +8,12 @@ const waitForCountInTab = async (tabId) => {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => {
-      const parseCount = (text) => {
-        const match = text.match(/([0-9.,]+)\s*Items\s*Found/i);
-        if (!match) {
-          return null;
-        }
-        return Number(match[1].replace(/,/g, ""));
-      };
-
       return new Promise((resolve) => {
         const existing = document.querySelector(".count");
         if (existing) {
-          const parsed = parseCount(existing.textContent || "");
-          if (parsed !== null) {
-            resolve(parsed);
+          const text = existing.textContent?.trim();
+          if (text) {
+            resolve(text);
             return;
           }
         }
@@ -40,11 +32,11 @@ const waitForCountInTab = async (tabId) => {
           if (!element) {
             return;
           }
-          const parsed = parseCount(element.textContent || "");
-          if (parsed !== null) {
+          const text = element.textContent?.trim();
+          if (text) {
             clearTimeout(timeout);
             observer.disconnect();
-            resolve(parsed);
+            resolve(text);
           }
         });
 
