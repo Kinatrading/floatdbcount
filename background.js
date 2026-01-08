@@ -5,6 +5,7 @@ chrome.action.onClicked.addListener(() => {
 });
 
 const RATE_LIMIT_DEFAULT = 125;
+const GLOBAL_RATE_LIMIT_DEFAULT = 50000;
 
 const getNextHourStart = (baseMs = Date.now()) => {
   const nextHour = new Date(baseMs);
@@ -29,36 +30,64 @@ const parseResetTimeMs = (value) => {
 const formatResetTime = (date) =>
   date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+const buildRateLimitPayload = (headers = [], defaultLimit) => {
+  const remainingHeader = headers.find(
+    (header) => header.name.toLowerCase() === "x-ratelimit-remaining"
+  );
+  if (!remainingHeader) {
+    return null;
+  }
+  const limitHeader = headers.find(
+    (header) => header.name.toLowerCase() === "x-ratelimit-limit"
+  );
+  const resetHeader = headers.find(
+    (header) => header.name.toLowerCase() === "x-ratelimit-reset"
+  );
+  const remaining = Number(remainingHeader.value);
+  const limit = Number(limitHeader?.value ?? defaultLimit);
+  const resetTimeMs = parseResetTimeMs(resetHeader?.value);
+  const resetDate = resetTimeMs ? new Date(resetTimeMs) : getNextHourStart();
+  return {
+    remaining: Number.isFinite(remaining) ? remaining : null,
+    limit: Number.isFinite(limit) ? limit : defaultLimit,
+    resetTime: formatResetTime(resetDate),
+    resetTimeMs: resetDate.getTime()
+  };
+};
+
 chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
-    const headers = details.responseHeaders || [];
-    const remainingHeader = headers.find(
-      (header) => header.name.toLowerCase() === "x-ratelimit-remaining"
+    const payload = buildRateLimitPayload(
+      details.responseHeaders || [],
+      RATE_LIMIT_DEFAULT
     );
-    if (!remainingHeader) {
+    if (!payload) {
       return;
     }
-    const limitHeader = headers.find(
-      (header) => header.name.toLowerCase() === "x-ratelimit-limit"
-    );
-    const resetHeader = headers.find(
-      (header) => header.name.toLowerCase() === "x-ratelimit-reset"
-    );
-    const remaining = Number(remainingHeader.value);
-    const limit = Number(limitHeader?.value ?? RATE_LIMIT_DEFAULT);
-    const resetTimeMs = parseResetTimeMs(resetHeader?.value);
-    const resetDate = resetTimeMs ? new Date(resetTimeMs) : getNextHourStart();
     chrome.runtime.sendMessage({
       action: "rateLimitUpdate",
-      payload: {
-        remaining: Number.isFinite(remaining) ? remaining : null,
-        limit: Number.isFinite(limit) ? limit : RATE_LIMIT_DEFAULT,
-        resetTime: formatResetTime(resetDate),
-        resetTimeMs: resetDate.getTime()
-      }
+      payload
     });
   },
   { urls: ["https://csfloat.com/api/v1/floatdb/search*"] },
+  ["responseHeaders"]
+);
+
+chrome.webRequest.onHeadersReceived.addListener(
+  (details) => {
+    const payload = buildRateLimitPayload(
+      details.responseHeaders || [],
+      GLOBAL_RATE_LIMIT_DEFAULT
+    );
+    if (!payload) {
+      return;
+    }
+    chrome.runtime.sendMessage({
+      action: "globalRateLimitUpdate",
+      payload
+    });
+  },
+  { urls: ["https://csfloat.com/api/v1/floatdb/count*"] },
   ["responseHeaders"]
 );
 
@@ -84,6 +113,13 @@ const waitForCountInTab = async (tabId) => {
               return;
             }
 
+            const emptyState = document.body?.textContent?.includes("Found No Items");
+            if (emptyState) {
+              clearInterval(timer);
+              resolve("0 Items Found");
+              return;
+            }
+
             const el = document.querySelector(selector);
             if (!el) {
               return;
@@ -92,6 +128,10 @@ const waitForCountInTab = async (tabId) => {
             const text = (el.textContent || "").trim();
             const match = text.match(/([\d,.\s]+)\s+Items\s+Found/i);
             if (!match) {
+              if (/found\s+no\s+items/i.test(text)) {
+                clearInterval(timer);
+                resolve("0 Items Found");
+              }
               return;
             }
 

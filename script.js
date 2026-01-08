@@ -26,6 +26,7 @@ const summaryList = document.getElementById("summary-list");
 const progressBar = document.getElementById("progress-bar");
 const progressMeta = document.getElementById("progress-meta");
 const rateLimitDisplay = document.getElementById("rate-limit");
+const globalRateLimitDisplay = document.getElementById("rate-limit-global");
 const downloadCsvButton = document.getElementById("download-csv");
 const languageSelect = document.getElementById("language-select");
 
@@ -75,8 +76,10 @@ const translations = {
     summaryDateLabel: "Дата: {date}",
     progressMeta: "{current} / {total}",
     rateLimitLabel: "Лишилось запитів:",
+    globalRateLimitLabel: "Глобальний ліміт:",
     downloadCsvName: "sticker-summary.csv",
-    csvStickerHeader: "Наліпка"
+    csvStickerHeader: "Наліпка",
+    capsuleEstimateLabel: "Приблизна кількість відкритих капсул: {value}"
   },
   en: {
     title: "CSFloat DB Sticker Linker created by Kina",
@@ -123,8 +126,10 @@ const translations = {
     summaryDateLabel: "Date: {date}",
     progressMeta: "{current} / {total}",
     rateLimitLabel: "Requests left:",
+    globalRateLimitLabel: "Global limit:",
     downloadCsvName: "sticker-summary.csv",
-    csvStickerHeader: "Sticker"
+    csvStickerHeader: "Sticker",
+    capsuleEstimateLabel: "Approx opened capsules: {value}"
   }
 };
 
@@ -136,6 +141,7 @@ let resumeTimerId = null;
 let pausePromise = null;
 let pausePromiseResolve = null;
 let lastRateLimitPayload = null;
+let lastGlobalRateLimitPayload = null;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -185,6 +191,9 @@ const applyTranslations = () => {
   if (lastRateLimitPayload) {
     updateRateLimitDisplay(lastRateLimitPayload);
   }
+  if (lastGlobalRateLimitPayload) {
+    updateGlobalRateLimitDisplay(lastGlobalRateLimitPayload);
+  }
 };
 
 const updateProgress = (current, total) => {
@@ -208,6 +217,18 @@ const updateRateLimitDisplay = ({ remaining, limit, resetTime } = {}) => {
     return;
   }
   rateLimitDisplay.textContent = `${t("rateLimitLabel")} ${remaining}/${limit}/ ${resetTime}`;
+};
+
+const updateGlobalRateLimitDisplay = ({ remaining, limit, resetTime } = {}) => {
+  if (!globalRateLimitDisplay) {
+    return;
+  }
+  lastGlobalRateLimitPayload = { remaining, limit, resetTime };
+  if (remaining == null || limit == null || !resetTime) {
+    globalRateLimitDisplay.textContent = "—";
+    return;
+  }
+  globalRateLimitDisplay.textContent = `${t("globalRateLimitLabel")} ${remaining}/${limit}/ ${resetTime}`;
 };
 
 const clearResumeTimer = () => {
@@ -584,6 +605,9 @@ const parseItemsFoundCount = (text) => {
   if (!text) {
     return null;
   }
+  if (/found\s+no\s+items/i.test(text)) {
+    return 0;
+  }
   const match = text.match(/([\d,.\s]+)\s+Items\s+Found/i);
   if (!match) {
     return null;
@@ -723,13 +747,27 @@ const renderSummary = (summaryItems) => {
       formatLocaleNumber(summary.total)
     );
 
+    const capsuleEstimate = document.createElement("div");
+    const estimateValue =
+      summary.capsuleEstimate == null
+        ? "—"
+        : `${formatLocaleNumber(summary.total)} × ${formatLocaleNumber(
+            summary.gradeMultiplier
+          )} × ${formatLocaleNumber(summary.collectionCount)} = ${formatLocaleNumber(
+            summary.capsuleEstimate
+          )}`;
+    capsuleEstimate.textContent = t("capsuleEstimateLabel").replace(
+      "{value}",
+      estimateValue
+    );
+
     const date = document.createElement("div");
     date.textContent = t("summaryDateLabel").replace(
       "{date}",
       formatLocaleDate(summary.date)
     );
 
-    content.append(title, counts, total, date);
+    content.append(title, counts, total, capsuleEstimate, date);
 
     const aside = document.createElement("div");
     aside.className = "summary-aside";
@@ -789,6 +827,12 @@ const renderSelectedStickers = (stickers) => {
 let stickersData = [];
 let collectionsData = [];
 const selectedStickerMap = new Map();
+const GRADE_MULTIPLIERS = {
+  "High Grade": 1.25,
+  Remarkable: 6.24,
+  Exotic: 31.2,
+  Extraordinary: 156
+};
 
 const normalizeValue = (value) => value.toLowerCase().trim();
 
@@ -855,6 +899,20 @@ const stickerHasCollection = (sticker, collection) => {
     (entry) => entry.name === collection
   );
   return Boolean(inCrates || inCollections);
+};
+
+const getStickerPrimaryCollectionName = (sticker) =>
+  sticker.crates?.[0]?.name || sticker.collections?.[0]?.name || null;
+
+const countStickersInCollectionByRarity = (collectionName, rarityName) => {
+  if (!collectionName || !rarityName) {
+    return null;
+  }
+  return stickersData.filter(
+    (sticker) =>
+      stickerHasCollection(sticker, collectionName) &&
+      sticker.rarity?.name === rarityName
+  ).length;
 };
 
 const updateCollectionSuggestions = () => {
@@ -983,6 +1041,16 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
   });
 }
 
+if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.action !== "globalRateLimitUpdate") {
+      return;
+    }
+    const payload = message.payload || {};
+    updateGlobalRateLimitDisplay(payload);
+  });
+}
+
 runBtn.addEventListener("click", () => {
   const selectedStickers = [...selectedStickerMap.values()];
   if (selectedStickers.length === 0) {
@@ -1059,6 +1127,16 @@ runBtn.addEventListener("click", () => {
 
       const totals = computeStickerTotals(results);
       if (totals) {
+        const gradeMultiplier = GRADE_MULTIPLIERS[sticker.rarity?.name] ?? null;
+        const collectionName = getStickerPrimaryCollectionName(sticker);
+        const collectionCount = countStickersInCollectionByRarity(
+          collectionName,
+          sticker.rarity?.name
+        );
+        const capsuleEstimate =
+          gradeMultiplier == null || collectionCount == null
+            ? null
+            : totals.total * gradeMultiplier * collectionCount;
         summaryItems.push({
           name: `${sticker.name} (${sticker.def_index})`,
           title: sticker.name,
@@ -1066,6 +1144,9 @@ runBtn.addEventListener("click", () => {
           image: sticker.image,
           pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
           total: totals.total,
+          gradeMultiplier,
+          collectionCount,
+          capsuleEstimate,
           date: new Date().toISOString()
         });
       }
