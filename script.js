@@ -87,6 +87,7 @@ const translations = {
     remove: "Видалити",
     alertSelect: "Оберіть хоча б одну наліпку або брелок.",
     summaryCountsLabel: "1х: {c1}, 2х: {c2}, 3х: {c3}, 4х: {c4}, 5х: {c5}",
+    summaryKeychainCountsLabel: "1х: {c1}",
     summaryTotalLabel: "Сумарна кількість поклеєних: {total}",
     summaryDateLabel: "Дата: {date}",
     progressMeta: "{current} / {total}",
@@ -94,7 +95,8 @@ const translations = {
     globalRateLimitLabel: "Глобальний ліміт:",
     downloadCsvName: "sticker-summary.csv",
     csvStickerHeader: "Предмет",
-    capsuleEstimateLabel: "Приблизна кількість відкритих капсул: {value}"
+    capsuleEstimateLabel: "Приблизна кількість відкритих капсул: {value}",
+    keychainEstimateLabel: "Приблизна кількість відкритих брелоків: {value}"
   },
   en: {
     title: "CSFloat DB Sticker Linker created by Kina",
@@ -144,6 +146,7 @@ const translations = {
     remove: "Remove",
     alertSelect: "Select at least one sticker or keychain.",
     summaryCountsLabel: "1x: {c1}, 2x: {c2}, 3x: {c3}, 4x: {c4}, 5x: {c5}",
+    summaryKeychainCountsLabel: "1x: {c1}",
     summaryTotalLabel: "Total applied: {total}",
     summaryDateLabel: "Date: {date}",
     progressMeta: "{current} / {total}",
@@ -151,7 +154,8 @@ const translations = {
     globalRateLimitLabel: "Global limit:",
     downloadCsvName: "sticker-summary.csv",
     csvStickerHeader: "Item",
-    capsuleEstimateLabel: "Approx opened capsules: {value}"
+    capsuleEstimateLabel: "Approx opened capsules: {value}",
+    keychainEstimateLabel: "Approx opened keychains: {value}"
   }
 };
 
@@ -846,7 +850,11 @@ const renderSummary = (summaryItems) => {
     title.textContent = summary.name;
 
     const counts = document.createElement("div");
-    counts.textContent = t("summaryCountsLabel")
+    const countsTemplate =
+      summary.type === "keychain"
+        ? t("summaryKeychainCountsLabel")
+        : t("summaryCountsLabel");
+    counts.textContent = countsTemplate
       .replace("{c1}", formatLocaleNumber(summary.pureCounts[0]))
       .replace("{c2}", formatLocaleNumber(summary.pureCounts[1]))
       .replace("{c3}", formatLocaleNumber(summary.pureCounts[2]))
@@ -868,10 +876,9 @@ const renderSummary = (summaryItems) => {
           )} × ${formatLocaleNumber(summary.collectionCount)} = ${formatLocaleNumber(
             summary.capsuleEstimate
           )}`;
-    capsuleEstimate.textContent = t("capsuleEstimateLabel").replace(
-      "{value}",
-      estimateValue
-    );
+    const estimateLabelKey =
+      summary.type === "keychain" ? "keychainEstimateLabel" : "capsuleEstimateLabel";
+    capsuleEstimate.textContent = t(estimateLabelKey).replace("{value}", estimateValue);
 
     const date = document.createElement("div");
     date.textContent = t("summaryDateLabel").replace(
@@ -1418,6 +1425,7 @@ runBtn.addEventListener("click", () => {
               ? null
               : totals.total * gradeMultiplier * collectionCount;
           summaryItems.push({
+            type: "sticker",
             name: `${sticker.name} (${sticker.def_index})`,
             title: sticker.name,
             defIndex: sticker.def_index,
@@ -1477,6 +1485,7 @@ runBtn.addEventListener("click", () => {
               ? null
               : totals.total * gradeMultiplier * collectionCount;
           summaryItems.push({
+            type: "keychain",
             name: `${keychain.name} (${keychain.def_index})`,
             title: keychain.name,
             defIndex: keychain.def_index,
