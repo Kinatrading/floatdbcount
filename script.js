@@ -13,11 +13,19 @@ const stickerSearchInput = document.getElementById("sticker-search");
 const stickerSuggestions = document.getElementById("sticker-suggestions");
 const collectionSearchInput = document.getElementById("collection-search");
 const collectionSuggestions = document.getElementById("collection-suggestions");
+const keychainSearchInput = document.getElementById("keychain-search");
+const keychainSuggestions = document.getElementById("keychain-suggestions");
+const keychainCollectionSearchInput = document.getElementById("keychain-collection-search");
+const keychainCollectionSuggestions = document.getElementById(
+  "keychain-collection-suggestions"
+);
 const rarityCheckboxes = Array.from(
   document.querySelectorAll('input[name="rarity"]')
 );
 const selectedStickersList = document.getElementById("selected-stickers");
 const clearStickersButton = document.getElementById("clear-stickers");
+const selectedKeychainsList = document.getElementById("selected-keychains");
+const clearKeychainsButton = document.getElementById("clear-keychains");
 const runBtn = document.getElementById("run-btn");
 const stopBtn = document.getElementById("stop-btn");
 const generatedLink = document.getElementById("generated-link");
@@ -44,6 +52,7 @@ const translations = {
     minLabel: "Мінімум",
     maxLabel: "Максимум",
     stickersTitle: "Наліпки",
+    keychainsTitle: "Брелки",
     gradeLabel: "Грейд:",
     gradeAria: "Грейд наліпок",
     gradeAll: "Усі",
@@ -51,7 +60,12 @@ const translations = {
     stickerSearchPlaceholder: "Sticker | Fearsome",
     collectionSearch: "Пошук колекції",
     collectionSearchPlaceholder: "Sticker Capsule",
+    keychainSearch: "Пошук брелка",
+    keychainSearchPlaceholder: "Charm | Lil' Ava",
+    keychainCollectionSearch: "Пошук колекції",
+    keychainCollectionSearchPlaceholder: "Missing Link Charm Collection",
     selectedStickers: "Обрані наліпки:",
+    selectedKeychains: "Обрані брелки:",
     clearAll: "Видалити всі",
     run: "Run",
     stop: "Stop",
@@ -67,10 +81,11 @@ const translations = {
     waiting: "Очікування...",
     notFound: "Не знайдено",
     totalStickersLabel: "Загальна кількість поклеєних стікерів:",
+    totalKeychainsLabel: "Загальна кількість закріплених брелків:",
     summaryEmpty: "Підсумок буде доступний після запуску.",
-    selectedEmpty: "Наліпки не обрані.",
+    selectedEmpty: "Нічого не обрано.",
     remove: "Видалити",
-    alertSelect: "Оберіть хоча б одну наліпку.",
+    alertSelect: "Оберіть хоча б одну наліпку або брелок.",
     summaryCountsLabel: "1х: {c1}, 2х: {c2}, 3х: {c3}, 4х: {c4}, 5х: {c5}",
     summaryTotalLabel: "Сумарна кількість поклеєних: {total}",
     summaryDateLabel: "Дата: {date}",
@@ -78,7 +93,7 @@ const translations = {
     rateLimitLabel: "Лишилось запитів:",
     globalRateLimitLabel: "Глобальний ліміт:",
     downloadCsvName: "sticker-summary.csv",
-    csvStickerHeader: "Наліпка",
+    csvStickerHeader: "Предмет",
     capsuleEstimateLabel: "Приблизна кількість відкритих капсул: {value}"
   },
   en: {
@@ -94,6 +109,7 @@ const translations = {
     minLabel: "Minimum",
     maxLabel: "Maximum",
     stickersTitle: "Stickers",
+    keychainsTitle: "Keychains",
     gradeLabel: "Grade:",
     gradeAria: "Sticker grade",
     gradeAll: "All",
@@ -101,7 +117,12 @@ const translations = {
     stickerSearchPlaceholder: "Sticker | Fearsome",
     collectionSearch: "Collection search",
     collectionSearchPlaceholder: "Sticker Capsule",
+    keychainSearch: "Keychain search",
+    keychainSearchPlaceholder: "Charm | Lil' Ava",
+    keychainCollectionSearch: "Collection search",
+    keychainCollectionSearchPlaceholder: "Missing Link Charm Collection",
     selectedStickers: "Selected stickers:",
+    selectedKeychains: "Selected keychains:",
     clearAll: "Clear all",
     run: "Run",
     stop: "Stop",
@@ -117,10 +138,11 @@ const translations = {
     waiting: "Waiting...",
     notFound: "Not found",
     totalStickersLabel: "Total applied stickers:",
+    totalKeychainsLabel: "Total attached keychains:",
     summaryEmpty: "Summary will be available after running.",
-    selectedEmpty: "No stickers selected.",
+    selectedEmpty: "No items selected.",
     remove: "Remove",
-    alertSelect: "Select at least one sticker.",
+    alertSelect: "Select at least one sticker or keychain.",
     summaryCountsLabel: "1x: {c1}, 2x: {c2}, 3x: {c3}, 4x: {c4}, 5x: {c5}",
     summaryTotalLabel: "Total applied: {total}",
     summaryDateLabel: "Date: {date}",
@@ -128,7 +150,7 @@ const translations = {
     rateLimitLabel: "Requests left:",
     globalRateLimitLabel: "Global limit:",
     downloadCsvName: "sticker-summary.csv",
-    csvStickerHeader: "Sticker",
+    csvStickerHeader: "Item",
     capsuleEstimateLabel: "Approx opened capsules: {value}"
   }
 };
@@ -152,8 +174,11 @@ const t = (key) => translations[currentLanguage]?.[key] ?? key;
 const formatLocaleNumber = (value) =>
   Number(value).toLocaleString(currentLanguage === "uk" ? "uk-UA" : "en-US");
 
-const formatCountLabel = (count) =>
+const formatStickerCountLabel = (count) =>
   currentLanguage === "uk" ? `${count} наліпки` : `${count} stickers`;
+
+const formatKeychainCountLabel = () =>
+  currentLanguage === "uk" ? "1 брелок" : "1 keychain";
 
 const formatLocaleDate = (value) =>
   new Date(value).toLocaleString(currentLanguage === "uk" ? "uk-UA" : "en-US");
@@ -187,6 +212,7 @@ const applyTranslations = () => {
 
   updateProgress(0, progressTotal);
   renderSelectedStickers([...selectedStickerMap.values()]);
+  renderSelectedKeychains([...selectedKeychainMap.values()]);
   renderSummary(summaryItems);
   if (lastRateLimitPayload) {
     updateRateLimitDisplay(lastRateLimitPayload);
@@ -583,7 +609,7 @@ const buildStickerPayload = (stickerId, count) => {
   return JSON.stringify(items);
 };
 
-const buildUrl = (stickerId, count) => {
+const buildStickerUrl = (stickerId, count) => {
   const minValue = parseFloat(minRange.value);
   const maxValue = parseFloat(maxRange.value);
   const url = new URL("https://csfloat.com/db");
@@ -597,6 +623,27 @@ const buildUrl = (stickerId, count) => {
   url.searchParams.set("min", formatFloat(minValue));
   url.searchParams.set("max", formatFloat(maxValue));
   url.searchParams.set("stickers", buildStickerPayload(stickerId, count));
+
+  return url.toString();
+};
+
+const buildKeychainPayload = (keychainId) =>
+  JSON.stringify([{ i: String(keychainId) }]);
+
+const buildKeychainUrl = (keychainId) => {
+  const minValue = parseFloat(minRange.value);
+  const maxValue = parseFloat(maxRange.value);
+  const url = new URL("https://csfloat.com/db");
+  const categoryValue = categoryCheckboxes.find((checkbox) => checkbox.checked)
+    ?.value;
+
+  if (categoryValue && categoryValue !== "all") {
+    url.searchParams.set("category", categoryValue);
+  }
+
+  url.searchParams.set("min", formatFloat(minValue));
+  url.searchParams.set("max", formatFloat(maxValue));
+  url.searchParams.set("keychains", buildKeychainPayload(keychainId));
 
   return url.toString();
 };
@@ -656,6 +703,17 @@ const computeStickerTotals = (items) => {
   return { pureCounts, total };
 };
 
+const computeKeychainTotals = (item) => {
+  const count = parseItemsFoundCount(item.found);
+  if (count === null) {
+    return null;
+  }
+  return {
+    pureCounts: [count, 0, 0, 0, 0],
+    total: count
+  };
+};
+
 const renderStickerResults = (sticker, items) => {
   const existing = resultsList.querySelector(
     `[data-sticker-id="${sticker.def_index}"]`
@@ -679,7 +737,7 @@ const renderStickerResults = (sticker, items) => {
     const meta = document.createElement("div");
     meta.className = "result-meta";
     const countLabel = document.createElement("span");
-    countLabel.textContent = formatCountLabel(item.count);
+    countLabel.textContent = formatStickerCountLabel(item.count);
     const valueLabel = document.createElement("span");
     if (item.loading) {
       valueLabel.textContent = t("waiting");
@@ -707,6 +765,60 @@ const renderStickerResults = (sticker, items) => {
     total === null
       ? `${t("totalStickersLabel")} —`
       : `${t("totalStickersLabel")} ${formatLocaleNumber(total)}`;
+  block.appendChild(totalLabel);
+
+  resultsList.appendChild(block);
+};
+
+const renderKeychainResults = (keychain, item) => {
+  const existing = resultsList.querySelector(
+    `[data-keychain-id="${keychain.def_index}"]`
+  );
+  if (existing) {
+    existing.remove();
+  }
+
+  const block = document.createElement("div");
+  block.className = "sticker-block";
+  block.dataset.keychainId = keychain.def_index;
+
+  const title = document.createElement("h3");
+  title.textContent = `${keychain.name} (${keychain.def_index})`;
+  block.appendChild(title);
+
+  const listItem = document.createElement("div");
+  listItem.className = "result-item";
+
+  const meta = document.createElement("div");
+  meta.className = "result-meta";
+  const countLabel = document.createElement("span");
+  countLabel.textContent = formatKeychainCountLabel();
+  const valueLabel = document.createElement("span");
+  if (item.loading) {
+    valueLabel.textContent = t("waiting");
+  } else if (item.found === null) {
+    valueLabel.textContent = t("notFound");
+  } else {
+    valueLabel.textContent = item.found;
+  }
+  meta.append(countLabel, valueLabel);
+
+  const link = document.createElement("a");
+  link.href = item.url;
+  link.textContent = item.url;
+  link.target = "_blank";
+  link.rel = "noreferrer";
+
+  listItem.append(meta, link);
+  block.appendChild(listItem);
+
+  const total = parseItemsFoundCount(item.found);
+  const totalLabel = document.createElement("div");
+  totalLabel.className = "sticker-total";
+  totalLabel.textContent =
+    total === null
+      ? `${t("totalKeychainsLabel")} —`
+      : `${t("totalKeychainsLabel")} ${formatLocaleNumber(total)}`;
   block.appendChild(totalLabel);
 
   resultsList.appendChild(block);
@@ -824,9 +936,39 @@ const renderSelectedStickers = (stickers) => {
   });
 };
 
+const renderSelectedKeychains = (keychains) => {
+  selectedKeychainsList.innerHTML = "";
+  if (keychains.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "selected-item";
+    empty.textContent = t("selectedEmpty");
+    selectedKeychainsList.appendChild(empty);
+    return;
+  }
+
+  keychains.forEach((keychain) => {
+    const item = document.createElement("li");
+    item.className = "selected-item";
+    const label = document.createElement("span");
+    label.textContent = `${keychain.name} (${keychain.def_index})`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = t("remove");
+    remove.addEventListener("click", () => {
+      selectedKeychainMap.delete(keychain.def_index);
+      renderSelectedKeychains([...selectedKeychainMap.values()]);
+    });
+    item.append(label, remove);
+    selectedKeychainsList.appendChild(item);
+  });
+};
+
 let stickersData = [];
 let collectionsData = [];
 const selectedStickerMap = new Map();
+let keychainsData = [];
+let keychainCollectionsData = [];
+const selectedKeychainMap = new Map();
 const GRADE_MULTIPLIERS = {
   "High Grade": 1.25,
   Remarkable: 6.24,
@@ -959,11 +1101,107 @@ const addCollectionStickers = (collection) => {
   renderSelectedStickers([...selectedStickerMap.values()]);
 };
 
+const getKeychainSearchHaystack = (keychain) => {
+  return [keychain.name, keychain.market_hash_name, keychain.def_index, keychain.id]
+    .filter(Boolean)
+    .map((value) => normalizeValue(String(value)));
+};
+
+const updateKeychainSuggestions = () => {
+  const query = normalizeValue(keychainSearchInput.value);
+  keychainSuggestions.innerHTML = "";
+  if (!query) {
+    return;
+  }
+
+  const matches = keychainsData
+    .filter((keychain) =>
+      getKeychainSearchHaystack(keychain).some((value) => value.includes(query))
+    )
+    .slice(0, 8);
+
+  matches.forEach((keychain) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = `${keychain.name} (${keychain.def_index})`;
+    button.addEventListener("click", () => {
+      selectedKeychainMap.set(keychain.def_index, keychain);
+      renderSelectedKeychains([...selectedKeychainMap.values()]);
+      keychainSearchInput.value = "";
+      keychainSuggestions.innerHTML = "";
+    });
+    item.appendChild(button);
+    keychainSuggestions.appendChild(item);
+  });
+};
+
+const keychainHasCollection = (keychain, collection) =>
+  keychain.collections?.some((entry) => entry.name === collection);
+
+const getKeychainPrimaryCollectionName = (keychain) =>
+  keychain.collections?.[0]?.name || null;
+
+const countKeychainsInCollectionByRarity = (collectionName, rarityName) => {
+  if (!collectionName || !rarityName) {
+    return null;
+  }
+  return keychainsData.filter(
+    (keychain) =>
+      keychainHasCollection(keychain, collectionName) &&
+      keychain.rarity?.name === rarityName
+  ).length;
+};
+
+const updateKeychainCollectionSuggestions = () => {
+  const query = normalizeValue(keychainCollectionSearchInput.value);
+  keychainCollectionSuggestions.innerHTML = "";
+  if (!query) {
+    return;
+  }
+
+  const matches = keychainCollectionsData
+    .filter((collection) => normalizeValue(collection).includes(query))
+    .slice(0, 8);
+
+  matches.forEach((collection) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = collection;
+    button.addEventListener("click", () => {
+      addCollectionKeychains(collection);
+      keychainCollectionSearchInput.value = "";
+      keychainCollectionSuggestions.innerHTML = "";
+    });
+    item.appendChild(button);
+    keychainCollectionSuggestions.appendChild(item);
+  });
+};
+
+const addCollectionKeychains = (collection) => {
+  keychainsData
+    .filter((keychain) => keychainHasCollection(keychain, collection))
+    .forEach((keychain) => {
+      selectedKeychainMap.set(keychain.def_index, keychain);
+    });
+  renderSelectedKeychains([...selectedKeychainMap.values()]);
+};
+
 stickerSearchInput.addEventListener("input", updateStickerSuggestions);
 collectionSearchInput.addEventListener("input", updateCollectionSuggestions);
+keychainSearchInput.addEventListener("input", updateKeychainSuggestions);
+keychainCollectionSearchInput.addEventListener(
+  "input",
+  updateKeychainCollectionSuggestions
+);
 clearStickersButton.addEventListener("click", () => {
   selectedStickerMap.clear();
   renderSelectedStickers([]);
+});
+clearKeychainsButton.addEventListener("click", () => {
+  selectedKeychainMap.clear();
+  renderSelectedKeychains([]);
 });
 
 downloadCsvButton.addEventListener("click", () => {
@@ -1024,6 +1262,36 @@ const loadStickerData = async () => {
   }
 };
 
+const loadKeychainData = async () => {
+  try {
+    const buildUrl = (name) =>
+      typeof chrome !== "undefined" && chrome.runtime?.getURL
+        ? chrome.runtime.getURL(name)
+        : name;
+    const response = await fetch(buildUrl("keychains.json"));
+    if (!response.ok) {
+      throw new Error("Failed to load keychains.json");
+    }
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      throw new Error("Invalid keychain data");
+    }
+    keychainsData = data;
+    keychainCollectionsData = Array.from(
+      new Set(
+        data.flatMap((keychain) =>
+          (keychain.collections || []).map((collection) => collection.name)
+        )
+      )
+    ).sort();
+  } catch (error) {
+    keychainsData = [];
+    keychainCollectionsData = [];
+  } finally {
+    renderSelectedKeychains([...selectedKeychainMap.values()]);
+  }
+};
+
 if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.action !== "rateLimitUpdate") {
@@ -1052,8 +1320,17 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
 }
 
 runBtn.addEventListener("click", () => {
-  const selectedStickers = [...selectedStickerMap.values()];
-  if (selectedStickers.length === 0) {
+  const selectedItems = [
+    ...[...selectedStickerMap.values()].map((sticker) => ({
+      type: "sticker",
+      data: sticker
+    })),
+    ...[...selectedKeychainMap.values()].map((keychain) => ({
+      type: "keychain",
+      data: keychain
+    }))
+  ];
+  if (selectedItems.length === 0) {
     alert(t("alertSelect"));
     return;
   }
@@ -1063,7 +1340,7 @@ runBtn.addEventListener("click", () => {
   generatedLink.href = "#";
   generatedLink.textContent = "—";
   summaryItems = [];
-  progressTotal = selectedStickers.length;
+  progressTotal = selectedItems.length;
   updateProgress(0, progressTotal);
   downloadCsvButton.disabled = true;
   runBtn.disabled = true;
@@ -1075,7 +1352,7 @@ runBtn.addEventListener("click", () => {
   };
   let processed = 0;
   const runSequential = async () => {
-    for (const sticker of selectedStickers) {
+    for (const entry of selectedItems) {
       if (stopRequested) {
         break;
       }
@@ -1083,72 +1360,135 @@ runBtn.addEventListener("click", () => {
       if (stopRequested) {
         break;
       }
-      const urls = [1, 2, 3, 4, 5].map((count) => ({
-        count,
-        url: buildUrl(sticker.def_index, count)
-      }));
 
-      if (generatedLink.textContent === "—") {
-        generatedLink.href = urls[0].url;
-        generatedLink.textContent = urls[0].url;
-      }
+      if (entry.type === "sticker") {
+        const sticker = entry.data;
+        const urls = [1, 2, 3, 4, 5].map((count) => ({
+          count,
+          url: buildStickerUrl(sticker.def_index, count)
+        }));
 
-      renderStickerResults(
-        sticker,
-        urls.map((item) => ({ ...item, found: null, loading: true }))
-      );
+        if (generatedLink.textContent === "—") {
+          generatedLink.href = urls[0].url;
+          generatedLink.textContent = urls[0].url;
+        }
 
-      const response = stopRequested
-        ? null
-        : await new Promise((resolve) => {
-            chrome.runtime.sendMessage(
-              { action: "runCounts", urls: urls.map((u) => u.url) },
-              resolve
-            );
-          });
-
-      if (!response?.results) {
         renderStickerResults(
           sticker,
-          urls.map((item) => ({ ...item, found: null, loading: false }))
+          urls.map((item) => ({ ...item, found: null, loading: true }))
         );
-        processed += 1;
-        updateProgress(processed, progressTotal);
-        continue;
-      }
 
-      const results = response.results.map((result, index) => ({
-        count: index + 1,
-        url: result.url,
-        found: result.count,
-        loading: false
-      }));
-      renderStickerResults(sticker, results);
+        const response = stopRequested
+          ? null
+          : await new Promise((resolve) => {
+              chrome.runtime.sendMessage(
+                { action: "runCounts", urls: urls.map((u) => u.url) },
+                resolve
+              );
+            });
 
-      const totals = computeStickerTotals(results);
-      if (totals) {
-        const gradeMultiplier = GRADE_MULTIPLIERS[sticker.rarity?.name] ?? null;
-        const collectionName = getStickerPrimaryCollectionName(sticker);
-        const collectionCount = countStickersInCollectionByRarity(
-          collectionName,
-          sticker.rarity?.name
-        );
-        const capsuleEstimate =
-          gradeMultiplier == null || collectionCount == null
-            ? null
-            : totals.total * gradeMultiplier * collectionCount;
-        summaryItems.push({
-          name: `${sticker.name} (${sticker.def_index})`,
-          title: sticker.name,
-          defIndex: sticker.def_index,
-          image: sticker.image,
-          pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
-          total: totals.total,
-          gradeMultiplier,
-          collectionCount,
-          capsuleEstimate,
-          date: new Date().toISOString()
-        });
+        if (!response?.results) {
+          renderStickerResults(
+            sticker,
+            urls.map((item) => ({ ...item, found: null, loading: false }))
+          );
+          processed += 1;
+          updateProgress(processed, progressTotal);
+          continue;
+        }
+
+        const results = response.results.map((result, index) => ({
+          count: index + 1,
+          url: result.url,
+          found: result.count,
+          loading: false
+        }));
+        renderStickerResults(sticker, results);
+
+        const totals = computeStickerTotals(results);
+        if (totals) {
+          const gradeMultiplier = GRADE_MULTIPLIERS[sticker.rarity?.name] ?? null;
+          const collectionName = getStickerPrimaryCollectionName(sticker);
+          const collectionCount = countStickersInCollectionByRarity(
+            collectionName,
+            sticker.rarity?.name
+          );
+          const capsuleEstimate =
+            gradeMultiplier == null || collectionCount == null
+              ? null
+              : totals.total * gradeMultiplier * collectionCount;
+          summaryItems.push({
+            name: `${sticker.name} (${sticker.def_index})`,
+            title: sticker.name,
+            defIndex: sticker.def_index,
+            image: sticker.image,
+            pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
+            total: totals.total,
+            gradeMultiplier,
+            collectionCount,
+            capsuleEstimate,
+            date: new Date().toISOString()
+          });
+        }
+      } else {
+        const keychain = entry.data;
+        const url = buildKeychainUrl(keychain.def_index);
+
+        if (generatedLink.textContent === "—") {
+          generatedLink.href = url;
+          generatedLink.textContent = url;
+        }
+
+        renderKeychainResults(keychain, { url, found: null, loading: true });
+
+        const response = stopRequested
+          ? null
+          : await new Promise((resolve) => {
+              chrome.runtime.sendMessage(
+                { action: "runCounts", urls: [url] },
+                resolve
+              );
+            });
+
+        if (!response?.results?.length) {
+          renderKeychainResults(keychain, { url, found: null, loading: false });
+          processed += 1;
+          updateProgress(processed, progressTotal);
+          continue;
+        }
+
+        const result = {
+          url: response.results[0].url,
+          found: response.results[0].count,
+          loading: false
+        };
+        renderKeychainResults(keychain, result);
+
+        const totals = computeKeychainTotals(result);
+        if (totals) {
+          const gradeMultiplier = GRADE_MULTIPLIERS[keychain.rarity?.name] ?? null;
+          const collectionName = getKeychainPrimaryCollectionName(keychain);
+          const collectionCount = countKeychainsInCollectionByRarity(
+            collectionName,
+            keychain.rarity?.name
+          );
+          const capsuleEstimate =
+            gradeMultiplier == null || collectionCount == null
+              ? null
+              : totals.total * gradeMultiplier * collectionCount;
+          summaryItems.push({
+            name: `${keychain.name} (${keychain.def_index})`,
+            title: keychain.name,
+            defIndex: keychain.def_index,
+            image: keychain.image,
+            pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
+            total: totals.total,
+            gradeMultiplier,
+            collectionCount,
+            capsuleEstimate,
+            date: new Date().toISOString()
+          });
+        }
       }
 
       processed += 1;
@@ -1167,4 +1507,5 @@ runBtn.addEventListener("click", () => {
 syncInputs(0, 1);
 initCardToggles();
 loadStickerData();
+loadKeychainData();
 applyTranslations();
