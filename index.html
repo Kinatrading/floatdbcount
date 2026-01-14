@@ -164,6 +164,41 @@
         </div>
       </section>
 
+      <section class="card">
+        <h2><span data-i18n="keychainsTitle">Брелки</span></h2>
+        <div class="card-content">
+          <label class="full-width">
+            <span data-i18n="keychainSearch">Пошук брелка</span>
+            <input
+              type="text"
+              id="keychain-search"
+              placeholder="Charm | Lil' Ava"
+              autocomplete="off"
+              data-i18n-placeholder="keychainSearchPlaceholder"
+            />
+          </label>
+          <ul id="keychain-suggestions" class="suggestions"></ul>
+          <label class="full-width">
+            <span data-i18n="keychainCollectionSearch">Пошук колекції</span>
+            <input
+              type="text"
+              id="keychain-collection-search"
+              placeholder="Missing Link Charm Collection"
+              autocomplete="off"
+              data-i18n-placeholder="keychainCollectionSearchPlaceholder"
+            />
+          </label>
+          <ul id="keychain-collection-suggestions" class="suggestions"></ul>
+          <div class="selected-block">
+            <span data-i18n="selectedKeychains">Обрані брелки:</span>
+            <button type="button" id="clear-keychains" class="secondary-button">
+              <span data-i18n="clearAll">Видалити всі</span>
+            </button>
+            <ul id="selected-keychains" class="selected-list"></ul>
+          </div>
+        </div>
+      </section>
+
       <section class="card actions">
         <h2><span data-i18n="resultsTitle">Результати</span></h2>
         <div class="card-content">
