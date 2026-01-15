@@ -100,6 +100,7 @@ const translations = {
     globalRateLimitLabel: "Глобальний ліміт:",
     downloadCsvName: "sticker-summary.csv",
     csvStickerHeader: "Предмет",
+    csvAverageHeader: "Середня кількість на скін",
     capsuleEstimateLabel: "Приблизна кількість відкритих капсул: {value}",
     keychainEstimateLabel: "Приблизна кількість відкритих брелоків: {value}"
   },
@@ -163,6 +164,7 @@ const translations = {
     globalRateLimitLabel: "Global limit:",
     downloadCsvName: "sticker-summary.csv",
     csvStickerHeader: "Item",
+    csvAverageHeader: "Average per skin",
     capsuleEstimateLabel: "Approx opened capsules: {value}",
     keychainEstimateLabel: "Approx opened keychains: {value}"
   }
@@ -206,6 +208,12 @@ const formatAverageStickerLabel = (value) => {
     ? `${formatted} стікера на скін`
     : `${formatted} stickers per skin`;
 };
+
+const formatAverageStickerValue = (value) =>
+  Number(value).toLocaleString(currentLanguage === "uk" ? "uk-UA" : "en-US", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  });
 
 const formatLocaleDate = (value) =>
   new Date(value).toLocaleString(currentLanguage === "uk" ? "uk-UA" : "en-US");
@@ -388,6 +396,7 @@ const buildCsv = (items) => {
     "4x",
     "5x",
     t("summaryTotalLabel").replace("{total}", "").trim(),
+    t("csvAverageHeader"),
     t("summaryDateLabel").replace("{date}", "").trim()
   ];
   const rows = items.map((item) => [
@@ -398,6 +407,7 @@ const buildCsv = (items) => {
     item.pureCounts[3],
     item.pureCounts[4],
     item.total,
+    item.average == null ? "" : formatAverageStickerValue(item.average),
     formatLocaleDate(item.date)
   ]);
   return [headers, ...rows]
@@ -937,6 +947,16 @@ const renderSummary = (summaryItems) => {
       formatLocaleNumber(summary.total)
     );
 
+    const average = document.createElement("div");
+    if (summary.type === "sticker") {
+      average.textContent =
+        summary.average == null
+          ? `${t("averageStickersLabel")} —`
+          : `${t("averageStickersLabel")} ${formatAverageStickerLabel(
+              summary.average
+            )}`;
+    }
+
     const capsuleEstimate = document.createElement("div");
     const estimateValue =
       summary.capsuleEstimate == null
@@ -956,7 +976,11 @@ const renderSummary = (summaryItems) => {
       formatLocaleDate(summary.date)
     );
 
-    content.append(title, counts, total, capsuleEstimate, date);
+    content.append(title, counts, total);
+    if (summary.type === "sticker") {
+      content.append(average);
+    }
+    content.append(capsuleEstimate, date);
 
     const aside = document.createElement("div");
     aside.className = "summary-aside";
@@ -1286,7 +1310,7 @@ downloadCsvButton.addEventListener("click", () => {
     return;
   }
   const csv = buildCsv(summaryItems);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -1491,6 +1515,7 @@ runBtn.addEventListener("click", () => {
 
         const totals = computeStickerTotals(results);
         if (totals) {
+          const average = computeAverageStickersPerSkin(results);
           const gradeMultiplier = GRADE_MULTIPLIERS[sticker.rarity?.name] ?? null;
           const collectionName = getStickerPrimaryCollectionName(sticker);
           const collectionCount = countStickersInCollectionByRarity(
@@ -1509,6 +1534,7 @@ runBtn.addEventListener("click", () => {
             image: sticker.image,
             pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
             total: totals.total,
+            average,
             gradeMultiplier,
             collectionCount,
             capsuleEstimate,
@@ -1569,6 +1595,7 @@ runBtn.addEventListener("click", () => {
             image: keychain.image,
             pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
             total: totals.total,
+            average: null,
             gradeMultiplier,
             collectionCount,
             capsuleEstimate,
