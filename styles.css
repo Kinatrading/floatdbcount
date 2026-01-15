@@ -160,6 +160,12 @@ select {
   border: 1px solid #d4d8e5;
   font-size: 14px;
   background: #fff;
+  color: #1b1e28;
+}
+
+select option {
+  color: #1b1e28;
+  background: #fff;
 }
 
 .full-width {
@@ -275,6 +281,7 @@ button:disabled {
   background: #fff;
   cursor: pointer;
   font-size: 13px;
+  color: #1b1e28;
 }
 
 .suggestions button:hover {
@@ -647,6 +654,11 @@ button:disabled {
   border-color: #2e3446;
 }
 
+:root[data-theme="dark"] select option {
+  color: #e8eaf0;
+  background: #0f1117;
+}
+
 :root[data-theme="dark"] button {
   background: #3b82f6;
 }
@@ -751,117 +763,122 @@ button:disabled {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     background-color: #0f1117;
     color: #e8eaf0;
   }
 
-  body {
+  :root:not([data-theme]) body {
     background-color: #0f1117;
   }
 
-  .card {
+  :root:not([data-theme]) .card {
     background: #171a24;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   }
 
-  p {
+  :root:not([data-theme]) p {
     color: #a6adbd;
   }
 
-  .checkbox {
+  :root:not([data-theme]) .checkbox {
     background: #232838;
   }
 
-  .card-toggle:hover {
+  :root:not([data-theme]) .card-toggle:hover {
     background: rgba(59, 130, 246, 0.2);
   }
 
-  .suggestions button {
+  :root:not([data-theme]) .suggestions button {
     background: #171a24;
     border-color: #2e3446;
     color: #e8eaf0;
   }
 
-  .suggestions button:hover {
+  :root:not([data-theme]) .suggestions button:hover {
     background: #232838;
   }
 
-  .selected-item {
+  :root:not([data-theme]) .selected-item {
     background: #232838;
   }
 
-  .selected-item button {
+  :root:not([data-theme]) .selected-item button {
     color: #fca5a5;
   }
 
-  input[type="number"],
-  input[type="text"] {
+  :root:not([data-theme]) input[type="number"],
+  :root:not([data-theme]) input[type="text"] {
     background: #0f1117;
     color: #e8eaf0;
     border-color: #2e3446;
   }
 
-  select {
+  :root:not([data-theme]) select {
     background: #0f1117;
     color: #e8eaf0;
     border-color: #2e3446;
   }
 
-  button {
+  :root:not([data-theme]) select option {
+    color: #e8eaf0;
+    background: #0f1117;
+  }
+
+  :root:not([data-theme]) button {
     background: #3b82f6;
   }
 
-  button:hover {
+  :root:not([data-theme]) button:hover {
     background: #2563eb;
   }
 
-  .secondary-button {
+  :root:not([data-theme]) .secondary-button {
     background: #475569;
   }
 
-  .secondary-button:hover {
+  :root:not([data-theme]) .secondary-button:hover {
     background: #334155;
   }
 
-  .output a {
+  :root:not([data-theme]) .output a {
     color: #93c5fd;
   }
 
-  .progress {
+  :root:not([data-theme]) .progress {
     background: #232838;
   }
 
-  .progress-meta {
+  :root:not([data-theme]) .progress-meta {
     color: #a6adbd;
   }
 
-  .rate-limit {
+  :root:not([data-theme]) .rate-limit {
     color: #facc15;
   }
 
-  .result-item {
+  :root:not([data-theme]) .result-item {
     background: #232838;
   }
 
-  .result-meta {
+  :root:not([data-theme]) .result-meta {
     color: #a6adbd;
   }
 
-  .sticker-block {
+  :root:not([data-theme]) .sticker-block {
     background: #171a24;
     border-color: #2e3446;
   }
 
-  .sticker-total {
+  :root:not([data-theme]) .sticker-total {
     color: #e8eaf0;
   }
 
-  .sticker-average {
+  :root:not([data-theme]) .sticker-average {
     color: #a6adbd;
   }
 
-  .summary-item {
+  :root:not([data-theme]) .summary-item {
     color: #e8e8f2;
     border: none;
     background:
@@ -873,7 +890,7 @@ button:disabled {
       inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   }
 
-  .summary-item::before {
+  :root:not([data-theme]) .summary-item::before {
     content: "";
     position: absolute;
     inset: -20%;
@@ -889,7 +906,7 @@ button:disabled {
     pointer-events: none;
   }
 
-  .summary-item::after {
+  :root:not([data-theme]) .summary-item::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -903,11 +920,11 @@ button:disabled {
     pointer-events: none;
   }
 
-  .summary-image {
+  :root:not([data-theme]) .summary-image {
     background: transparent;
   }
 
-  .summary-image.is-empty {
+  :root:not([data-theme]) .summary-image.is-empty {
     background: rgba(255, 255, 255, 0.08);
   }
 }
