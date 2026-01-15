@@ -160,6 +160,12 @@ select {
   border: 1px solid #d4d8e5;
   font-size: 14px;
   background: #fff;
+  color: #1b1e28;
+}
+
+select option {
+  color: #1b1e28;
+  background: #fff;
 }
 
 .full-width {
@@ -647,6 +653,11 @@ button:disabled {
   border-color: #2e3446;
 }
 
+:root[data-theme="dark"] select option {
+  color: #e8eaf0;
+  background: #0f1117;
+}
+
 :root[data-theme="dark"] button {
   background: #3b82f6;
 }
@@ -806,6 +817,11 @@ button:disabled {
     background: #0f1117;
     color: #e8eaf0;
     border-color: #2e3446;
+  }
+
+  select option {
+    color: #e8eaf0;
+    background: #0f1117;
   }
 
   button {
