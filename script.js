@@ -37,12 +37,16 @@ const rateLimitDisplay = document.getElementById("rate-limit");
 const globalRateLimitDisplay = document.getElementById("rate-limit-global");
 const downloadCsvButton = document.getElementById("download-csv");
 const languageSelect = document.getElementById("language-select");
+const themeToggle = document.getElementById("theme-toggle");
 
 const translations = {
   uk: {
     title: "CSFloat DB Sticker Linker created by Kina",
     subtitle: "Згенеруйте посилання для пошуку скінів по наліпках та float.",
     language: "Мова",
+    themeLabel: "Тема",
+    themeToggleDark: "Темна тема",
+    themeToggleLight: "Світла тема",
     categoryTitle: "Категорія предметів",
     categoryAll: "Усі",
     categoryAria: "Категорія",
@@ -81,6 +85,7 @@ const translations = {
     waiting: "Очікування...",
     notFound: "Не знайдено",
     totalStickersLabel: "Загальна кількість поклеєних стікерів:",
+    averageStickersLabel: "Середня кількість:",
     totalKeychainsLabel: "Загальна кількість закріплених брелків:",
     summaryEmpty: "Підсумок буде доступний після запуску.",
     selectedEmpty: "Нічого не обрано.",
@@ -102,6 +107,9 @@ const translations = {
     title: "CSFloat DB Sticker Linker created by Kina",
     subtitle: "Generate links to search skins by stickers and float range.",
     language: "Language",
+    themeLabel: "Theme",
+    themeToggleDark: "Dark theme",
+    themeToggleLight: "Light theme",
     categoryTitle: "Item category",
     categoryAll: "All",
     categoryAria: "Category",
@@ -140,6 +148,7 @@ const translations = {
     waiting: "Waiting...",
     notFound: "Not found",
     totalStickersLabel: "Total applied stickers:",
+    averageStickersLabel: "Average:",
     totalKeychainsLabel: "Total attached keychains:",
     summaryEmpty: "Summary will be available after running.",
     selectedEmpty: "No items selected.",
@@ -160,6 +169,7 @@ const translations = {
 };
 
 let currentLanguage = "uk";
+let currentTheme = "light";
 let summaryItems = [];
 let progressTotal = 0;
 let isPaused = false;
@@ -184,8 +194,32 @@ const formatStickerCountLabel = (count) =>
 const formatKeychainCountLabel = () =>
   currentLanguage === "uk" ? "1 брелок" : "1 keychain";
 
+const formatAverageStickerLabel = (value) => {
+  const formatted = Number(value).toLocaleString(
+    currentLanguage === "uk" ? "uk-UA" : "en-US",
+    {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1
+    }
+  );
+  return currentLanguage === "uk"
+    ? `${formatted} стікера на скін`
+    : `${formatted} stickers per skin`;
+};
+
 const formatLocaleDate = (value) =>
   new Date(value).toLocaleString(currentLanguage === "uk" ? "uk-UA" : "en-US");
+
+const updateThemeToggleLabel = () => {
+  if (!themeToggle) {
+    return;
+  }
+  const nextTheme = currentTheme === "dark" ? "light" : "dark";
+  themeToggle.textContent = t(
+    nextTheme === "dark" ? "themeToggleDark" : "themeToggleLight"
+  );
+  themeToggle.setAttribute("aria-pressed", String(currentTheme === "dark"));
+};
 
 const applyTranslations = () => {
   document.documentElement.lang = currentLanguage;
@@ -224,6 +258,17 @@ const applyTranslations = () => {
   if (lastGlobalRateLimitPayload) {
     updateGlobalRateLimitDisplay(lastGlobalRateLimitPayload);
   }
+  updateThemeToggleLabel();
+};
+
+const getPreferredTheme = () =>
+  window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+
+const setTheme = (value) => {
+  currentTheme = value;
+  document.documentElement.dataset.theme = value;
+  localStorage.setItem("csfloat-theme", value);
+  updateThemeToggleLabel();
 };
 
 const updateProgress = (current, total) => {
@@ -684,6 +729,22 @@ const computeTotalStickers = (items) => {
   return pureCounts.reduce((sum, value, index) => sum + value * (index + 1), 0);
 };
 
+const computeAverageStickersPerSkin = (items) => {
+  const pureCounts = computePureCounts(items);
+  if (!pureCounts) {
+    return null;
+  }
+  const totalSkins = pureCounts.reduce((sum, value) => sum + value, 0);
+  if (totalSkins === 0) {
+    return 0;
+  }
+  const totalStickers = pureCounts.reduce(
+    (sum, value, index) => sum + value * (index + 1),
+    0
+  );
+  return totalStickers / totalSkins;
+};
+
 const computePureCounts = (items) => {
   const counts = items.map((item) => parseItemsFoundCount(item.found));
   if (counts.some((count) => count === null)) {
@@ -770,6 +831,15 @@ const renderStickerResults = (sticker, items) => {
       ? `${t("totalStickersLabel")} —`
       : `${t("totalStickersLabel")} ${formatLocaleNumber(total)}`;
   block.appendChild(totalLabel);
+
+  const average = computeAverageStickersPerSkin(items);
+  const averageLabel = document.createElement("div");
+  averageLabel.className = "sticker-average";
+  averageLabel.textContent =
+    average === null
+      ? `${t("averageStickersLabel")} —`
+      : `${t("averageStickersLabel")} ${formatAverageStickerLabel(average)}`;
+  block.appendChild(averageLabel);
 
   resultsList.appendChild(block);
 };
@@ -1232,6 +1302,13 @@ languageSelect.addEventListener("change", (event) => {
   applyTranslations();
 });
 
+if (themeToggle) {
+  themeToggle.addEventListener("click", () => {
+    const nextTheme = currentTheme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+  });
+}
+
 const loadStickerData = async () => {
   try {
     const buildUrl = (name) =>
@@ -1517,4 +1594,6 @@ syncInputs(0, 1);
 initCardToggles();
 loadStickerData();
 loadKeychainData();
+currentTheme = localStorage.getItem("csfloat-theme") || getPreferredTheme();
+setTheme(currentTheme);
 applyTranslations();
