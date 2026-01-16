@@ -378,6 +378,10 @@ button:disabled {
   flex: 1;
 }
 
+.summary-item.is-exporting .summary-content {
+  padding-left: 12px;
+}
+
 .summary-aside {
   display: flex;
   flex-direction: column;
