@@ -37,6 +37,7 @@ const rateLimitDisplay = document.getElementById("rate-limit");
 const globalRateLimitDisplay = document.getElementById("rate-limit-global");
 const downloadCsvButton = document.getElementById("download-csv");
 const downloadImagesButton = document.getElementById("download-images");
+const downloadCollageButton = document.getElementById("download-collage");
 const languageSelect = document.getElementById("language-select");
 const themeToggle = document.getElementById("theme-toggle");
 
@@ -80,6 +81,7 @@ const translations = {
     summaryLabel: "Збережений підсумок:",
     downloadCsv: "Завантажити CSV",
     downloadImages: "Завантажити всі картинки",
+    downloadCollage: "Завантажити однією картинкою",
     exportImage: "Експорт картинки",
     exportTitle: "CS2 STICKER HIGHLIGHT",
     exportTotalLabel: "ЗАГАЛЬНО ПОКЛЕЄНО",
@@ -101,6 +103,7 @@ const translations = {
     rateLimitLabel: "Лишилось запитів:",
     globalRateLimitLabel: "Глобальний ліміт:",
     downloadCsvName: "sticker-summary.csv",
+    downloadCollageName: "sticker-summary-collage",
     csvStickerHeader: "Предмет",
     csvAverageHeader: "Середня кількість на скін",
     csvGradeMultiplierHeader: "Множник грейду",
@@ -148,6 +151,7 @@ const translations = {
     summaryLabel: "Saved summary:",
     downloadCsv: "Download CSV",
     downloadImages: "Download all images",
+    downloadCollage: "Download as single image",
     exportImage: "Export image",
     exportTitle: "CS2 STICKER HIGHLIGHT",
     exportTotalLabel: "TOTAL POOLS",
@@ -169,6 +173,7 @@ const translations = {
     rateLimitLabel: "Requests left:",
     globalRateLimitLabel: "Global limit:",
     downloadCsvName: "sticker-summary.csv",
+    downloadCollageName: "sticker-summary-collage",
     csvStickerHeader: "Item",
     csvAverageHeader: "Average per skin",
     csvGradeMultiplierHeader: "Grade multiplier",
@@ -185,6 +190,7 @@ let summaryItems = [];
 let progressTotal = 0;
 let isPaused = false;
 let isDownloadingAllImages = false;
+let isDownloadingCollage = false;
 let resumeTimerId = null;
 let pausePromise = null;
 let pausePromiseResolve = null;
@@ -566,6 +572,91 @@ const exportAllSummaryImages = async () => {
   }
 };
 
+const buildSummaryCollageContainer = async () => {
+  const elements = Array.from(summaryList.querySelectorAll(".summary-item"));
+  if (elements.length === 0) {
+    return null;
+  }
+  const collageRoot = document.createElement("div");
+  collageRoot.className = "summary-collage-root";
+  const collage = document.createElement("div");
+  collage.className = "summary-collage";
+  collageRoot.appendChild(collage);
+  document.body.appendChild(collageRoot);
+
+  const blobUrls = [];
+  for (const element of elements) {
+    const clone = element.cloneNode(true);
+    clone.classList.add("is-collage");
+    const exportButton = clone.querySelector(".summary-export");
+    if (exportButton) {
+      exportButton.remove();
+    }
+    collage.appendChild(clone);
+
+    const image = clone.querySelector("img.summary-image");
+    if (image?.src) {
+      let blobUrl = await fetchImageAsBlobUrl(image.src);
+      if (!blobUrl && isSteamImageUrl(image.src)) {
+        const blob = await fetchSteamImageBlob(image.src);
+        if (blob) {
+          blobUrl = URL.createObjectURL(blob);
+        }
+      }
+      if (blobUrl) {
+        image.src = blobUrl;
+        blobUrls.push(blobUrl);
+      }
+    }
+    await waitForImage(image);
+  }
+  if (document.fonts?.ready) {
+    await document.fonts.ready;
+  }
+  return { collageRoot, collage, blobUrls };
+};
+
+const exportSummaryCollage = async () => {
+  if (summaryItems.length === 0 || isDownloadingCollage) {
+    return;
+  }
+  isDownloadingCollage = true;
+  if (downloadCollageButton) {
+    downloadCollageButton.disabled = true;
+  }
+
+  const prepared = await buildSummaryCollageContainer();
+  if (!prepared) {
+    isDownloadingCollage = false;
+    if (downloadCollageButton) {
+      downloadCollageButton.disabled = summaryItems.length === 0;
+    }
+    return;
+  }
+  const { collageRoot, collage, blobUrls } = prepared;
+  const backgroundColor = getComputedStyle(collage).backgroundColor || "#ffffff";
+  try {
+    const canvas = await html2canvas(collage, {
+      useCORS: true,
+      scale: 2,
+      backgroundColor
+    });
+    const link = document.createElement("a");
+    link.download = `${sanitizeFileName(t("downloadCollageName"))}.jpg`;
+    link.href = canvas.toDataURL("image/jpeg", 0.92);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    blobUrls.forEach((url) => URL.revokeObjectURL(url));
+    collageRoot.remove();
+    isDownloadingCollage = false;
+    if (downloadCollageButton) {
+      downloadCollageButton.disabled = summaryItems.length === 0;
+    }
+  }
+};
+
 const syncDisplays = (minValue, maxValue) => {
   minDisplay.textContent = formatFloat(minValue);
   maxDisplay.textContent = formatFloat(maxValue);
@@ -799,7 +890,7 @@ const renderStickerResults = (sticker, items) => {
   block.dataset.stickerId = sticker.def_index;
 
   const title = document.createElement("h3");
-  title.textContent = `${sticker.name} (${sticker.def_index})`;
+  title.textContent = sticker.name;
   block.appendChild(title);
 
   items.forEach((item) => {
@@ -864,7 +955,7 @@ const renderKeychainResults = (keychain, item) => {
   block.dataset.keychainId = keychain.def_index;
 
   const title = document.createElement("h3");
-  title.textContent = `${keychain.name} (${keychain.def_index})`;
+  title.textContent = keychain.name;
   block.appendChild(title);
 
   const listItem = document.createElement("div");
@@ -911,6 +1002,10 @@ const renderSummary = (summaryItems) => {
   if (downloadImagesButton) {
     downloadImagesButton.disabled = summaryItems.length === 0 || isDownloadingAllImages;
   }
+  if (downloadCollageButton) {
+    downloadCollageButton.disabled =
+      summaryItems.length === 0 || isDownloadingCollage;
+  }
   if (summaryItems.length === 0) {
     const empty = document.createElement("div");
     empty.className = "summary-item";
@@ -922,6 +1017,11 @@ const renderSummary = (summaryItems) => {
   summaryItems.forEach((summary) => {
     const item = document.createElement("div");
     item.className = "summary-item";
+
+    const watermark = document.createElement("div");
+    watermark.className = "summary-id";
+    watermark.textContent = `#${summary.defIndex ?? ""}`;
+    watermark.setAttribute("aria-hidden", "true");
 
     const content = document.createElement("div");
     content.className = "summary-content";
@@ -985,6 +1085,9 @@ const renderSummary = (summaryItems) => {
     const aside = document.createElement("div");
     aside.className = "summary-aside";
 
+    const imageWrap = document.createElement("div");
+    imageWrap.className = "summary-image-wrap";
+
     const image = document.createElement("img");
     image.className = "summary-image";
     image.alt = summary.title || summary.name;
@@ -995,6 +1098,7 @@ const renderSummary = (summaryItems) => {
     } else {
       image.classList.add("is-empty");
     }
+    imageWrap.appendChild(image);
 
     const exportButton = document.createElement("button");
     exportButton.type = "button";
@@ -1004,8 +1108,8 @@ const renderSummary = (summaryItems) => {
       exportSummaryImage(summary, item);
     });
 
-    aside.append(image, exportButton);
-    item.append(content, aside);
+    aside.append(imageWrap, exportButton);
+    item.append(watermark, content, aside);
     summaryList.appendChild(item);
   });
 };
@@ -1024,7 +1128,7 @@ const renderSelectedStickers = (stickers) => {
     const item = document.createElement("li");
     item.className = "selected-item";
     const label = document.createElement("span");
-    label.textContent = `${sticker.name} (${sticker.def_index})`;
+    label.textContent = sticker.name;
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = t("remove");
@@ -1051,7 +1155,7 @@ const renderSelectedKeychains = (keychains) => {
     const item = document.createElement("li");
     item.className = "selected-item";
     const label = document.createElement("span");
-    label.textContent = `${keychain.name} (${keychain.def_index})`;
+    label.textContent = keychain.name;
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = t("remove");
@@ -1124,7 +1228,7 @@ const updateStickerSuggestions = () => {
     const item = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `${sticker.name} (${sticker.def_index})`;
+    button.textContent = sticker.name;
     button.addEventListener("click", () => {
       selectedStickerMap.set(sticker.def_index, sticker);
       renderSelectedStickers([...selectedStickerMap.values()]);
@@ -1225,7 +1329,7 @@ const updateKeychainSuggestions = () => {
     const item = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `${keychain.name} (${keychain.def_index})`;
+    button.textContent = keychain.name;
     button.addEventListener("click", () => {
       selectedKeychainMap.set(keychain.def_index, keychain);
       renderSelectedKeychains([...selectedKeychainMap.values()]);
@@ -1324,6 +1428,12 @@ downloadCsvButton.addEventListener("click", () => {
 if (downloadImagesButton) {
   downloadImagesButton.addEventListener("click", () => {
     exportAllSummaryImages();
+  });
+}
+
+if (downloadCollageButton) {
+  downloadCollageButton.addEventListener("click", () => {
+    exportSummaryCollage();
   });
 }
 
@@ -1455,11 +1565,15 @@ runBtn.addEventListener("click", () => {
   generatedLink.textContent = "—";
   summaryItems = [];
   isDownloadingAllImages = false;
+  isDownloadingCollage = false;
   progressTotal = selectedItems.length;
   updateProgress(0, progressTotal);
   downloadCsvButton.disabled = true;
   if (downloadImagesButton) {
     downloadImagesButton.disabled = true;
+  }
+  if (downloadCollageButton) {
+    downloadCollageButton.disabled = true;
   }
   runBtn.disabled = true;
   stopBtn.disabled = false;
@@ -1538,7 +1652,7 @@ runBtn.addEventListener("click", () => {
               : totals.total * gradeMultiplier * collectionCount;
           summaryItems.push({
             type: "sticker",
-            name: `${sticker.name} (${sticker.def_index})`,
+            name: sticker.name,
             title: sticker.name,
             defIndex: sticker.def_index,
             image: sticker.image,
@@ -1599,7 +1713,7 @@ runBtn.addEventListener("click", () => {
               : totals.total * gradeMultiplier * collectionCount;
           summaryItems.push({
             type: "keychain",
-            name: `${keychain.name} (${keychain.def_index})`,
+            name: keychain.name,
             title: keychain.name,
             defIndex: keychain.def_index,
             image: keychain.image,
@@ -1626,6 +1740,10 @@ runBtn.addEventListener("click", () => {
     downloadCsvButton.disabled = summaryItems.length === 0;
     if (downloadImagesButton) {
       downloadImagesButton.disabled = summaryItems.length === 0 || isDownloadingAllImages;
+    }
+    if (downloadCollageButton) {
+      downloadCollageButton.disabled =
+        summaryItems.length === 0 || isDownloadingCollage;
     }
   });
 });
