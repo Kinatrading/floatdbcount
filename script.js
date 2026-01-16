@@ -469,6 +469,22 @@ const fetchSteamImageBlob = (url) =>
     });
   });
 
+const fetchImageAsBlobUrl = async (url) => {
+  if (!url) {
+    return null;
+  }
+  try {
+    const response = await fetch(url, { mode: "cors", credentials: "omit" });
+    if (!response.ok) {
+      return null;
+    }
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  } catch (error) {
+    return null;
+  }
+};
+
 const exportSummaryImage = async (summary, element) => {
   if (typeof html2canvas === "undefined") {
     return;
@@ -478,10 +494,15 @@ const exportSummaryImage = async (summary, element) => {
   }
   const image = element.querySelector("img.summary-image");
   let blobUrl = null;
-  if (image && isSteamImageUrl(image.src)) {
-    const blob = await fetchSteamImageBlob(image.src);
-    if (blob) {
-      blobUrl = URL.createObjectURL(blob);
+  if (image?.src) {
+    blobUrl = await fetchImageAsBlobUrl(image.src);
+    if (!blobUrl && isSteamImageUrl(image.src)) {
+      const blob = await fetchSteamImageBlob(image.src);
+      if (blob) {
+        blobUrl = URL.createObjectURL(blob);
+      }
+    }
+    if (blobUrl) {
       image.src = blobUrl;
     }
   }
