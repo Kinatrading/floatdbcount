@@ -399,7 +399,12 @@ button:disabled {
 
 .summary-export {
   width: 100%;
-  display:none;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.summary-item.is-exporting .summary-export {
+  visibility: hidden;
 }
 
 .summary-item strong {
