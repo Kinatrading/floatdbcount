@@ -38,6 +38,9 @@ const globalRateLimitDisplay = document.getElementById("rate-limit-global");
 const downloadCsvButton = document.getElementById("download-csv");
 const downloadImagesButton = document.getElementById("download-images");
 const downloadCollageButton = document.getElementById("download-collage");
+const downloadCollageHorizontalButton = document.getElementById(
+  "download-collage-horizontal"
+);
 const languageSelect = document.getElementById("language-select");
 const themeToggle = document.getElementById("theme-toggle");
 const summaryShowImageCheckbox = document.getElementById("summary-show-image");
@@ -102,6 +105,7 @@ const translations = {
     downloadCsv: "Завантажити CSV",
     downloadImages: "Завантажити всі картинки",
     downloadCollage: "Завантажити однією картинкою",
+    downloadCollageHorizontal: 'Завантажити однією картинкою "горизонтально"',
     exportImage: "Експорт картинки",
     exportTitle: "CS2 STICKER HIGHLIGHT",
     exportTotalLabel: "ЗАГАЛЬНО ПОКЛЕЄНО",
@@ -124,6 +128,7 @@ const translations = {
     globalRateLimitLabel: "Глобальний ліміт:",
     downloadCsvName: "sticker-summary.csv",
     downloadCollageName: "sticker-summary-collage",
+    downloadCollageHorizontalName: "sticker-summary-collage-horizontal",
     csvStickerHeader: "Предмет",
     csvAverageHeader: "Середня кількість на скін",
     csvGradeMultiplierHeader: "Множник грейду",
@@ -185,6 +190,7 @@ const translations = {
     downloadCsv: "Download CSV",
     downloadImages: "Download all images",
     downloadCollage: "Download as single image",
+    downloadCollageHorizontal: 'Download as single image "horizontal"',
     exportImage: "Export image",
     exportTitle: "CS2 STICKER HIGHLIGHT",
     exportTotalLabel: "TOTAL POOLS",
@@ -207,6 +213,7 @@ const translations = {
     globalRateLimitLabel: "Global limit:",
     downloadCsvName: "sticker-summary.csv",
     downloadCollageName: "sticker-summary-collage",
+    downloadCollageHorizontalName: "sticker-summary-collage-horizontal",
     csvStickerHeader: "Item",
     csvAverageHeader: "Average per skin",
     csvGradeMultiplierHeader: "Grade multiplier",
@@ -227,6 +234,7 @@ let progressTotal = 0;
 let isPaused = false;
 let isDownloadingAllImages = false;
 let isDownloadingCollage = false;
+let isDownloadingHorizontalCollage = false;
 let resumeTimerId = null;
 let pausePromise = null;
 let pausePromiseResolve = null;
@@ -562,6 +570,74 @@ const fetchImageAsBlobUrl = async (url) => {
   }
 };
 
+const buildSummaryTextLines = (summary, settings) => {
+  const lines = [];
+  if (settings.title) {
+    lines.push(summary.name);
+  }
+  if (settings.counts) {
+    const countsTemplate =
+      summary.type === "keychain"
+        ? t("summaryKeychainCountsLabel")
+        : t("summaryCountsLabel");
+    lines.push(
+      countsTemplate
+        .replace("{c1}", formatLocaleNumber(summary.pureCounts[0]))
+        .replace("{c2}", formatLocaleNumber(summary.pureCounts[1]))
+        .replace("{c3}", formatLocaleNumber(summary.pureCounts[2]))
+        .replace("{c4}", formatLocaleNumber(summary.pureCounts[3]))
+        .replace("{c5}", formatLocaleNumber(summary.pureCounts[4]))
+    );
+  }
+  if (settings.total) {
+    lines.push(
+      t("summaryTotalLabel").replace("{total}", formatLocaleNumber(summary.total))
+    );
+  }
+  if (summary.type === "sticker" && settings.average) {
+    const averageText =
+      summary.average == null
+        ? `${t("averageStickersLabel")} —`
+        : `${t("averageStickersLabel")} ${formatAverageStickerLabel(summary.average)}`;
+    lines.push(averageText);
+  }
+  if (settings.estimate) {
+    const estimateValue =
+      summary.capsuleEstimate == null
+        ? "—"
+        : `${formatLocaleNumber(summary.total)} × ${formatLocaleNumber(
+            summary.gradeMultiplier
+          )} × ${formatLocaleNumber(summary.collectionCount)} = ${formatLocaleNumber(
+            summary.capsuleEstimate
+          )}`;
+    const estimateLabelKey =
+      summary.type === "keychain" ? "keychainEstimateLabel" : "capsuleEstimateLabel";
+    lines.push(t(estimateLabelKey).replace("{value}", estimateValue));
+  }
+  if (settings.hiddenEstimate) {
+    const shouldShowHiddenEstimate =
+      (summary.type === "sticker" && selectedStickerCollection) ||
+      (summary.type === "keychain" && selectedKeychainCollection);
+    if (shouldShowHiddenEstimate) {
+      const hiddenValue =
+        summary.hiddenEstimate == null
+          ? "—"
+          : `${formatLocaleNumber(summary.hiddenCapsules)} ÷ ${formatLocaleNumber(
+              summary.collectionCount
+            )} ÷ ${formatLocaleNumber(summary.gradeMultiplier)} = ${formatLocaleNumber(
+              summary.hiddenEstimate
+            )}`;
+      lines.push(t("hiddenEstimateLabel").replace("{value}", hiddenValue));
+    }
+  }
+  if (settings.date) {
+    lines.push(
+      t("summaryDateLabel").replace("{date}", formatLocaleDate(summary.date))
+    );
+  }
+  return lines;
+};
+
 const exportSummaryImage = async (summary, element) => {
   if (typeof html2canvas === "undefined") {
     return;
@@ -728,6 +804,75 @@ const buildSummaryCollageContainer = async () => {
   return { collageRoot, collage, blobUrls };
 };
 
+const buildSummaryHorizontalCollageContainer = async () => {
+  if (summaryItems.length === 0) {
+    return null;
+  }
+  const collageRoot = document.createElement("div");
+  collageRoot.className = "summary-collage-root";
+  const collage = document.createElement("div");
+  collage.className = "summary-collage-horizontal";
+  collageRoot.appendChild(collage);
+  document.body.appendChild(collageRoot);
+
+  const blobUrls = [];
+  for (const summary of summaryItems) {
+    const card = document.createElement("div");
+    card.className = "summary-collage-card";
+
+    const text = document.createElement("div");
+    text.className = "summary-collage-text";
+    const lines = buildSummaryTextLines(summary, summaryDisplaySettings);
+    if (lines.length === 0) {
+      const emptyLine = document.createElement("div");
+      emptyLine.textContent = "—";
+      text.appendChild(emptyLine);
+    } else {
+      lines.forEach((line) => {
+        const row = document.createElement("div");
+        row.textContent = line;
+        text.appendChild(row);
+      });
+    }
+
+    const imageWrap = document.createElement("div");
+    imageWrap.className = "summary-collage-image-wrap";
+    const image = document.createElement("img");
+    image.className = "summary-collage-image";
+    image.alt = summary.title || summary.name;
+    if (summaryDisplaySettings.image && summary.image) {
+      image.crossOrigin = "anonymous";
+      image.referrerPolicy = "no-referrer";
+      image.src = summary.image;
+    } else {
+      image.classList.add("is-empty");
+    }
+    imageWrap.appendChild(image);
+
+    card.append(text, imageWrap);
+    collage.appendChild(card);
+
+    if (image?.src) {
+      let blobUrl = await fetchImageAsBlobUrl(image.src);
+      if (!blobUrl && isSteamImageUrl(image.src)) {
+        const blob = await fetchSteamImageBlob(image.src);
+        if (blob) {
+          blobUrl = URL.createObjectURL(blob);
+        }
+      }
+      if (blobUrl) {
+        image.src = blobUrl;
+        blobUrls.push(blobUrl);
+      }
+    }
+    await waitForImage(image);
+  }
+  if (document.fonts?.ready) {
+    await document.fonts.ready;
+  }
+  return { collageRoot, collage, blobUrls };
+};
+
 const exportSummaryCollage = async () => {
   if (summaryItems.length === 0 || isDownloadingCollage) {
     return;
@@ -765,6 +910,47 @@ const exportSummaryCollage = async () => {
     isDownloadingCollage = false;
     if (downloadCollageButton) {
       downloadCollageButton.disabled = summaryItems.length === 0;
+    }
+  }
+};
+
+const exportSummaryCollageHorizontal = async () => {
+  if (summaryItems.length === 0 || isDownloadingHorizontalCollage) {
+    return;
+  }
+  isDownloadingHorizontalCollage = true;
+  if (downloadCollageHorizontalButton) {
+    downloadCollageHorizontalButton.disabled = true;
+  }
+
+  const prepared = await buildSummaryHorizontalCollageContainer();
+  if (!prepared) {
+    isDownloadingHorizontalCollage = false;
+    if (downloadCollageHorizontalButton) {
+      downloadCollageHorizontalButton.disabled = summaryItems.length === 0;
+    }
+    return;
+  }
+  const { collageRoot, collage, blobUrls } = prepared;
+  const backgroundColor = getComputedStyle(collage).backgroundColor || "#ffffff";
+  try {
+    const canvas = await html2canvas(collage, {
+      useCORS: true,
+      scale: 2,
+      backgroundColor
+    });
+    const link = document.createElement("a");
+    link.download = `${sanitizeFileName(t("downloadCollageHorizontalName"))}.jpg`;
+    link.href = canvas.toDataURL("image/jpeg", 0.92);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    blobUrls.forEach((url) => URL.revokeObjectURL(url));
+    collageRoot.remove();
+    isDownloadingHorizontalCollage = false;
+    if (downloadCollageHorizontalButton) {
+      downloadCollageHorizontalButton.disabled = summaryItems.length === 0;
     }
   }
 };
@@ -1117,6 +1303,10 @@ const renderSummary = (summaryItems) => {
   if (downloadCollageButton) {
     downloadCollageButton.disabled =
       summaryItems.length === 0 || isDownloadingCollage;
+  }
+  if (downloadCollageHorizontalButton) {
+    downloadCollageHorizontalButton.disabled =
+      summaryItems.length === 0 || isDownloadingHorizontalCollage;
   }
   if (summaryItems.length === 0) {
     const empty = document.createElement("div");
@@ -1595,6 +1785,12 @@ if (downloadCollageButton) {
   });
 }
 
+if (downloadCollageHorizontalButton) {
+  downloadCollageHorizontalButton.addEventListener("click", () => {
+    exportSummaryCollageHorizontal();
+  });
+}
+
 languageSelect.addEventListener("change", (event) => {
   currentLanguage = event.target.value;
   applyTranslations();
@@ -1739,6 +1935,7 @@ runBtn.addEventListener("click", () => {
   summaryItems = [];
   isDownloadingAllImages = false;
   isDownloadingCollage = false;
+  isDownloadingHorizontalCollage = false;
   progressTotal = selectedItems.length;
   updateProgress(0, progressTotal);
   downloadCsvButton.disabled = true;
@@ -1747,6 +1944,9 @@ runBtn.addEventListener("click", () => {
   }
   if (downloadCollageButton) {
     downloadCollageButton.disabled = true;
+  }
+  if (downloadCollageHorizontalButton) {
+    downloadCollageHorizontalButton.disabled = true;
   }
   runBtn.disabled = true;
   stopBtn.disabled = false;
@@ -1920,6 +2120,10 @@ runBtn.addEventListener("click", () => {
     if (downloadCollageButton) {
       downloadCollageButton.disabled =
         summaryItems.length === 0 || isDownloadingCollage;
+    }
+    if (downloadCollageHorizontalButton) {
+      downloadCollageHorizontalButton.disabled =
+        summaryItems.length === 0 || isDownloadingHorizontalCollage;
     }
   });
 });
