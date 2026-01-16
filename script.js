@@ -890,7 +890,7 @@ const renderStickerResults = (sticker, items) => {
   block.dataset.stickerId = sticker.def_index;
 
   const title = document.createElement("h3");
-  title.textContent = `${sticker.name} (${sticker.def_index})`;
+  title.textContent = sticker.name;
   block.appendChild(title);
 
   items.forEach((item) => {
@@ -955,7 +955,7 @@ const renderKeychainResults = (keychain, item) => {
   block.dataset.keychainId = keychain.def_index;
 
   const title = document.createElement("h3");
-  title.textContent = `${keychain.name} (${keychain.def_index})`;
+  title.textContent = keychain.name;
   block.appendChild(title);
 
   const listItem = document.createElement("div");
@@ -1017,6 +1017,11 @@ const renderSummary = (summaryItems) => {
   summaryItems.forEach((summary) => {
     const item = document.createElement("div");
     item.className = "summary-item";
+
+    const watermark = document.createElement("div");
+    watermark.className = "summary-id";
+    watermark.textContent = `#${summary.defIndex ?? ""}`;
+    watermark.setAttribute("aria-hidden", "true");
 
     const content = document.createElement("div");
     content.className = "summary-content";
@@ -1080,6 +1085,9 @@ const renderSummary = (summaryItems) => {
     const aside = document.createElement("div");
     aside.className = "summary-aside";
 
+    const imageWrap = document.createElement("div");
+    imageWrap.className = "summary-image-wrap";
+
     const image = document.createElement("img");
     image.className = "summary-image";
     image.alt = summary.title || summary.name;
@@ -1090,6 +1098,7 @@ const renderSummary = (summaryItems) => {
     } else {
       image.classList.add("is-empty");
     }
+    imageWrap.appendChild(image);
 
     const exportButton = document.createElement("button");
     exportButton.type = "button";
@@ -1099,8 +1108,8 @@ const renderSummary = (summaryItems) => {
       exportSummaryImage(summary, item);
     });
 
-    aside.append(image, exportButton);
-    item.append(content, aside);
+    aside.append(imageWrap, exportButton);
+    item.append(watermark, content, aside);
     summaryList.appendChild(item);
   });
 };
@@ -1119,7 +1128,7 @@ const renderSelectedStickers = (stickers) => {
     const item = document.createElement("li");
     item.className = "selected-item";
     const label = document.createElement("span");
-    label.textContent = `${sticker.name} (${sticker.def_index})`;
+    label.textContent = sticker.name;
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = t("remove");
@@ -1146,7 +1155,7 @@ const renderSelectedKeychains = (keychains) => {
     const item = document.createElement("li");
     item.className = "selected-item";
     const label = document.createElement("span");
-    label.textContent = `${keychain.name} (${keychain.def_index})`;
+    label.textContent = keychain.name;
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = t("remove");
@@ -1219,7 +1228,7 @@ const updateStickerSuggestions = () => {
     const item = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `${sticker.name} (${sticker.def_index})`;
+    button.textContent = sticker.name;
     button.addEventListener("click", () => {
       selectedStickerMap.set(sticker.def_index, sticker);
       renderSelectedStickers([...selectedStickerMap.values()]);
@@ -1320,7 +1329,7 @@ const updateKeychainSuggestions = () => {
     const item = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `${keychain.name} (${keychain.def_index})`;
+    button.textContent = keychain.name;
     button.addEventListener("click", () => {
       selectedKeychainMap.set(keychain.def_index, keychain);
       renderSelectedKeychains([...selectedKeychainMap.values()]);
@@ -1643,7 +1652,7 @@ runBtn.addEventListener("click", () => {
               : totals.total * gradeMultiplier * collectionCount;
           summaryItems.push({
             type: "sticker",
-            name: `${sticker.name} (${sticker.def_index})`,
+            name: sticker.name,
             title: sticker.name,
             defIndex: sticker.def_index,
             image: sticker.image,
@@ -1704,7 +1713,7 @@ runBtn.addEventListener("click", () => {
               : totals.total * gradeMultiplier * collectionCount;
           summaryItems.push({
             type: "keychain",
-            name: `${keychain.name} (${keychain.def_index})`,
+            name: keychain.name,
             title: keychain.name,
             defIndex: keychain.def_index,
             image: keychain.image,
