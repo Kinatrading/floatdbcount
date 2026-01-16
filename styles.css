@@ -342,6 +342,22 @@ button:disabled {
   gap: 8px;
 }
 
+.summary-collage-root {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  z-index: -1;
+}
+
+.summary-collage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 900px;
+  padding: 16px;
+  background: #f0f2f8;
+}
+
 .summary-item {
   position: relative;
   display: flex;
