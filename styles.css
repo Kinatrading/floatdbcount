@@ -380,8 +380,8 @@ button:disabled {
 }
 
 .summary-collage-card {
-  width: 1080px;
-  height: 1920px;
+  width: 580px;
+  height: 1100px;
   display: flex;
   flex-direction: column;
   gap: 36px;
@@ -402,7 +402,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  font-size: 32px;
+  font-size: 30px;
   line-height: 1.35;
 }
 
@@ -422,8 +422,8 @@ button:disabled {
 }
 
 .summary-collage-image {
-  max-width: 90%;
-  max-height: 90%;
+  max-width: 95%;
+  max-height: 95%;
   object-fit: contain;
 }
 
