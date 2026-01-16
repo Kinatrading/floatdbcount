@@ -40,6 +40,16 @@ const downloadImagesButton = document.getElementById("download-images");
 const downloadCollageButton = document.getElementById("download-collage");
 const languageSelect = document.getElementById("language-select");
 const themeToggle = document.getElementById("theme-toggle");
+const summaryShowImageCheckbox = document.getElementById("summary-show-image");
+const summaryShowTitleCheckbox = document.getElementById("summary-show-title");
+const summaryShowCountsCheckbox = document.getElementById("summary-show-counts");
+const summaryShowTotalCheckbox = document.getElementById("summary-show-total");
+const summaryShowAverageCheckbox = document.getElementById("summary-show-average");
+const summaryShowEstimateCheckbox = document.getElementById("summary-show-estimate");
+const summaryShowHiddenEstimateCheckbox = document.getElementById(
+  "summary-show-hidden-estimate"
+);
+const summaryShowDateCheckbox = document.getElementById("summary-show-date");
 
 const translations = {
   uk: {
@@ -79,6 +89,16 @@ const translations = {
     generatedLink: "Згенероване посилання:",
     resultsLabel: "Посилання та кількість:",
     summaryLabel: "Збережений підсумок:",
+    summarySettingsLabel: "Налаштування підсумку:",
+    summarySettingsAria: "Налаштування підсумку",
+    summaryShowImage: "Показувати картинку",
+    summaryShowTitle: "Показувати назву",
+    summaryShowCounts: "Показувати кількість",
+    summaryShowTotal: "Показувати суму",
+    summaryShowAverage: "Показувати середнє",
+    summaryShowEstimate: "Показувати оцінку відкриттів",
+    summaryShowHiddenEstimate: "Показувати приховану оцінку",
+    summaryShowDate: "Показувати дату",
     downloadCsv: "Завантажити CSV",
     downloadImages: "Завантажити всі картинки",
     downloadCollage: "Завантажити однією картинкою",
@@ -109,8 +129,10 @@ const translations = {
     csvGradeMultiplierHeader: "Множник грейду",
     csvCollectionCountHeader: "Кількість у колекції",
     csvEstimateHeader: "Оцінка відкриттів",
-    capsuleEstimateLabel: "Приблизна кількість відкритих капсул: {value}",
-    keychainEstimateLabel: "Приблизна кількість відкритих брелоків: {value}",
+    capsuleEstimateLabel:
+      "Приблизна кількість відкритих капсул (стосується лише предметів після 2020 року): {value}",
+    keychainEstimateLabel:
+      "Приблизна кількість відкритих брелоків (стосується лише предметів після 2020 року): {value}",
     hiddenEstimateLabel: "Приблизно сховано цього предмета: {value}"
   },
   en: {
@@ -150,6 +172,16 @@ const translations = {
     generatedLink: "Generated link:",
     resultsLabel: "Links and count:",
     summaryLabel: "Saved summary:",
+    summarySettingsLabel: "Summary settings:",
+    summarySettingsAria: "Summary settings",
+    summaryShowImage: "Show image",
+    summaryShowTitle: "Show name",
+    summaryShowCounts: "Show counts",
+    summaryShowTotal: "Show total",
+    summaryShowAverage: "Show average",
+    summaryShowEstimate: "Show opening estimate",
+    summaryShowHiddenEstimate: "Show hidden estimate",
+    summaryShowDate: "Show date",
     downloadCsv: "Download CSV",
     downloadImages: "Download all images",
     downloadCollage: "Download as single image",
@@ -180,8 +212,10 @@ const translations = {
     csvGradeMultiplierHeader: "Grade multiplier",
     csvCollectionCountHeader: "Collection count",
     csvEstimateHeader: "Openings estimate",
-    capsuleEstimateLabel: "Approx opened capsules: {value}",
-    keychainEstimateLabel: "Approx opened keychains: {value}",
+    capsuleEstimateLabel:
+      "Approx opened capsules (items after 2020 only): {value}",
+    keychainEstimateLabel:
+      "Approx opened keychains (items after 2020 only): {value}",
     hiddenEstimateLabel: "Approx hidden for this item: {value}"
   }
 };
@@ -200,6 +234,16 @@ let lastRateLimitPayload = null;
 let lastGlobalRateLimitPayload = null;
 let selectedStickerCollection = null;
 let selectedKeychainCollection = null;
+let summaryDisplaySettings = {
+  image: true,
+  title: true,
+  counts: true,
+  total: true,
+  average: true,
+  estimate: true,
+  hiddenEstimate: true,
+  date: true
+};
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -279,6 +323,7 @@ const applyTranslations = () => {
   updateProgress(0, progressTotal);
   renderSelectedStickers([...selectedStickerMap.values()]);
   renderSelectedKeychains([...selectedKeychainMap.values()]);
+  summaryDisplaySettings = readSummaryDisplaySettings();
   renderSummary(summaryItems);
   if (lastRateLimitPayload) {
     updateRateLimitDisplay(lastRateLimitPayload);
@@ -287,6 +332,22 @@ const applyTranslations = () => {
     updateGlobalRateLimitDisplay(lastGlobalRateLimitPayload);
   }
   updateThemeToggleLabel();
+};
+
+const readSummaryDisplaySettings = () => ({
+  image: summaryShowImageCheckbox?.checked ?? true,
+  title: summaryShowTitleCheckbox?.checked ?? true,
+  counts: summaryShowCountsCheckbox?.checked ?? true,
+  total: summaryShowTotalCheckbox?.checked ?? true,
+  average: summaryShowAverageCheckbox?.checked ?? true,
+  estimate: summaryShowEstimateCheckbox?.checked ?? true,
+  hiddenEstimate: summaryShowHiddenEstimateCheckbox?.checked ?? true,
+  date: summaryShowDateCheckbox?.checked ?? true
+});
+
+const updateSummaryDisplaySettings = () => {
+  summaryDisplaySettings = readSummaryDisplaySettings();
+  renderSummary(summaryItems);
 };
 
 const getPreferredTheme = () =>
@@ -1147,33 +1208,48 @@ const renderSummary = (summaryItems) => {
       formatLocaleDate(summary.date)
     );
 
-    content.append(title, counts, total);
-    if (summary.type === "sticker") {
+    if (summaryDisplaySettings.title) {
+      content.append(title);
+    }
+    if (summaryDisplaySettings.counts) {
+      content.append(counts);
+    }
+    if (summaryDisplaySettings.total) {
+      content.append(total);
+    }
+    if (summary.type === "sticker" && summaryDisplaySettings.average) {
       content.append(average);
     }
-    if (hiddenEstimate) {
-      content.append(capsuleEstimate, hiddenEstimate, date);
-    } else {
-      content.append(capsuleEstimate, date);
+    if (summaryDisplaySettings.estimate) {
+      content.append(capsuleEstimate);
+    }
+    if (summaryDisplaySettings.hiddenEstimate && hiddenEstimate) {
+      content.append(hiddenEstimate);
+    }
+    if (summaryDisplaySettings.date) {
+      content.append(date);
     }
 
     const aside = document.createElement("div");
     aside.className = "summary-aside";
 
-    const imageWrap = document.createElement("div");
-    imageWrap.className = "summary-image-wrap";
+    let imageWrap = null;
+    if (summaryDisplaySettings.image) {
+      imageWrap = document.createElement("div");
+      imageWrap.className = "summary-image-wrap";
 
-    const image = document.createElement("img");
-    image.className = "summary-image";
-    image.alt = summary.title || summary.name;
-    if (summary.image) {
-      image.crossOrigin = "anonymous";
-      image.referrerPolicy = "no-referrer";
-      image.src = summary.image;
-    } else {
-      image.classList.add("is-empty");
+      const image = document.createElement("img");
+      image.className = "summary-image";
+      image.alt = summary.title || summary.name;
+      if (summary.image) {
+        image.crossOrigin = "anonymous";
+        image.referrerPolicy = "no-referrer";
+        image.src = summary.image;
+      } else {
+        image.classList.add("is-empty");
+      }
+      imageWrap.appendChild(image);
     }
-    imageWrap.appendChild(image);
 
     const exportButton = document.createElement("button");
     exportButton.type = "button";
@@ -1183,7 +1259,10 @@ const renderSummary = (summaryItems) => {
       exportSummaryImage(summary, item);
     });
 
-    aside.append(imageWrap, exportButton);
+    if (imageWrap) {
+      aside.append(imageWrap);
+    }
+    aside.append(exportButton);
     item.append(watermark, content, aside);
     summaryList.appendChild(item);
   });
@@ -1527,6 +1606,21 @@ if (themeToggle) {
     setTheme(nextTheme);
   });
 }
+
+[
+  summaryShowImageCheckbox,
+  summaryShowTitleCheckbox,
+  summaryShowCountsCheckbox,
+  summaryShowTotalCheckbox,
+  summaryShowAverageCheckbox,
+  summaryShowEstimateCheckbox,
+  summaryShowHiddenEstimateCheckbox,
+  summaryShowDateCheckbox
+].forEach((checkbox) => {
+  if (checkbox) {
+    checkbox.addEventListener("change", updateSummaryDisplaySettings);
+  }
+});
 
 const loadStickerData = async () => {
   try {

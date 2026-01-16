@@ -233,6 +233,17 @@ button:disabled {
   font-size: 13px;
 }
 
+.summary-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.summary-settings-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .output a {
   color: #1d4ed8;
   word-break: break-all;
