@@ -505,7 +505,7 @@ button:disabled {
 .summary-item.is-collage .summary-content {
   flex: 1;
   padding: 46px 12px 10px 18px;
-  max-width: 520px;
+  max-width: 1520px;
 }
 
 .summary-item.is-exporting .summary-content strong,
