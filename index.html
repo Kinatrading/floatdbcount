@@ -240,6 +240,48 @@
           </div>
           <div class="output">
             <span data-i18n="summaryLabel">Збережений підсумок:</span>
+            <div class="summary-settings">
+              <span data-i18n="summarySettingsLabel">Налаштування підсумку:</span>
+              <div
+                class="checkbox-grid summary-settings-grid"
+                role="group"
+                aria-label="Налаштування підсумку"
+                data-i18n-aria="summarySettingsAria"
+              >
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-image" checked />
+                  <span data-i18n="summaryShowImage">Показувати картинку</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-title" checked />
+                  <span data-i18n="summaryShowTitle">Показувати назву</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-counts" checked />
+                  <span data-i18n="summaryShowCounts">Показувати кількість</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-total" checked />
+                  <span data-i18n="summaryShowTotal">Показувати суму</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-average" checked />
+                  <span data-i18n="summaryShowAverage">Показувати середнє</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-estimate" checked />
+                  <span data-i18n="summaryShowEstimate">Показувати оцінку відкриттів</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-hidden-estimate" checked />
+                  <span data-i18n="summaryShowHiddenEstimate">Показувати приховану оцінку</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-date" checked />
+                  <span data-i18n="summaryShowDate">Показувати дату</span>
+                </label>
+              </div>
+            </div>
             <button id="download-csv" class="secondary-button" type="button" disabled>
               <span data-i18n="downloadCsv">Завантажити CSV</span>
             </button>
@@ -248,6 +290,16 @@
             </button>
             <button id="download-collage" class="secondary-button" type="button" disabled>
               <span data-i18n="downloadCollage">Завантажити однією картинкою</span>
+            </button>
+            <button
+              id="download-collage-horizontal"
+              class="secondary-button"
+              type="button"
+              disabled
+            >
+              <span data-i18n="downloadCollageHorizontal">
+                Завантажити однією картинкою "горизонтально"
+              </span>
             </button>
             <div id="summary-list" class="summary-list"></div>
           </div>
