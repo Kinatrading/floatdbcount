@@ -111,7 +111,7 @@ const translations = {
     csvEstimateHeader: "Оцінка відкриттів",
     capsuleEstimateLabel: "Приблизна кількість відкритих капсул: {value}",
     keychainEstimateLabel: "Приблизна кількість відкритих брелоків: {value}",
-    hiddenEstimateLabel: "Приблизно сховано відносно макс: {value}"
+    hiddenEstimateLabel: "Приблизно сховано цього предмета: {value}"
   },
   en: {
     title: "CSFloat DB Sticker Linker created by Kina",
@@ -182,7 +182,7 @@ const translations = {
     csvEstimateHeader: "Openings estimate",
     capsuleEstimateLabel: "Approx opened capsules: {value}",
     keychainEstimateLabel: "Approx opened keychains: {value}",
-    hiddenEstimateLabel: "Approx hidden vs max: {value}"
+    hiddenEstimateLabel: "Approx hidden for this item: {value}"
   }
 };
 
@@ -603,13 +603,20 @@ const applyHiddenEstimates = () => {
       if (item.type !== type) {
         return;
       }
-      if (typeof item.capsuleEstimate === "number") {
+      if (
+        typeof item.capsuleEstimate === "number" &&
+        typeof item.gradeMultiplier === "number" &&
+        typeof item.collectionCount === "number"
+      ) {
+        const hiddenCapsules = Math.max(0, maxEstimate - item.capsuleEstimate);
         const hiddenEstimate = Math.max(
           0,
-          Math.round(maxEstimate - item.capsuleEstimate)
+          Math.round(hiddenCapsules / (item.gradeMultiplier * item.collectionCount))
         );
+        item.hiddenCapsules = hiddenCapsules;
         item.hiddenEstimate = hiddenEstimate;
       } else {
+        item.hiddenCapsules = null;
         item.hiddenEstimate = null;
       }
     });
@@ -1123,7 +1130,11 @@ const renderSummary = (summaryItems) => {
       const hiddenValue =
         summary.hiddenEstimate == null
           ? "—"
-          : formatLocaleNumber(summary.hiddenEstimate);
+          : `${formatLocaleNumber(summary.hiddenCapsules)} ÷ ${formatLocaleNumber(
+              summary.collectionCount
+            )} ÷ ${formatLocaleNumber(summary.gradeMultiplier)} = ${formatLocaleNumber(
+              summary.hiddenEstimate
+            )}`;
       hiddenEstimate.textContent = t("hiddenEstimateLabel").replace(
         "{value}",
         hiddenValue
