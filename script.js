@@ -110,7 +110,8 @@ const translations = {
     csvCollectionCountHeader: "Кількість у колекції",
     csvEstimateHeader: "Оцінка відкриттів",
     capsuleEstimateLabel: "Приблизна кількість відкритих капсул: {value}",
-    keychainEstimateLabel: "Приблизна кількість відкритих брелоків: {value}"
+    keychainEstimateLabel: "Приблизна кількість відкритих брелоків: {value}",
+    hiddenEstimateLabel: "Приблизно сховано відносно макс: {value}"
   },
   en: {
     title: "CSFloat DB Sticker Linker created by Kina",
@@ -180,7 +181,8 @@ const translations = {
     csvCollectionCountHeader: "Collection count",
     csvEstimateHeader: "Openings estimate",
     capsuleEstimateLabel: "Approx opened capsules: {value}",
-    keychainEstimateLabel: "Approx opened keychains: {value}"
+    keychainEstimateLabel: "Approx opened keychains: {value}",
+    hiddenEstimateLabel: "Approx hidden vs max: {value}"
   }
 };
 
@@ -196,6 +198,8 @@ let pausePromise = null;
 let pausePromiseResolve = null;
 let lastRateLimitPayload = null;
 let lastGlobalRateLimitPayload = null;
+let selectedStickerCollection = null;
+let selectedKeychainCollection = null;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -570,6 +574,46 @@ const exportAllSummaryImages = async () => {
   if (downloadImagesButton) {
     downloadImagesButton.disabled = summaryItems.length === 0;
   }
+};
+
+const applyHiddenEstimates = () => {
+  const types = [
+    { type: "sticker", collection: selectedStickerCollection },
+    { type: "keychain", collection: selectedKeychainCollection }
+  ];
+
+  types.forEach(({ type, collection }) => {
+    if (!collection) {
+      return;
+    }
+    const estimateValues = summaryItems
+      .filter((item) => item.type === type && typeof item.capsuleEstimate === "number")
+      .map((item) => item.capsuleEstimate);
+    if (estimateValues.length === 0) {
+      summaryItems.forEach((item) => {
+        if (item.type === type) {
+          item.hiddenEstimate = null;
+        }
+      });
+      return;
+    }
+
+    const maxEstimate = Math.max(...estimateValues);
+    summaryItems.forEach((item) => {
+      if (item.type !== type) {
+        return;
+      }
+      if (typeof item.capsuleEstimate === "number") {
+        const hiddenEstimate = Math.max(
+          0,
+          Math.round(maxEstimate - item.capsuleEstimate)
+        );
+        item.hiddenEstimate = hiddenEstimate;
+      } else {
+        item.hiddenEstimate = null;
+      }
+    });
+  });
 };
 
 const buildSummaryCollageContainer = async () => {
@@ -1070,6 +1114,22 @@ const renderSummary = (summaryItems) => {
       summary.type === "keychain" ? "keychainEstimateLabel" : "capsuleEstimateLabel";
     capsuleEstimate.textContent = t(estimateLabelKey).replace("{value}", estimateValue);
 
+    const shouldShowHiddenEstimate =
+      (summary.type === "sticker" && selectedStickerCollection) ||
+      (summary.type === "keychain" && selectedKeychainCollection);
+    let hiddenEstimate = null;
+    if (shouldShowHiddenEstimate) {
+      hiddenEstimate = document.createElement("div");
+      const hiddenValue =
+        summary.hiddenEstimate == null
+          ? "—"
+          : formatLocaleNumber(summary.hiddenEstimate);
+      hiddenEstimate.textContent = t("hiddenEstimateLabel").replace(
+        "{value}",
+        hiddenValue
+      );
+    }
+
     const date = document.createElement("div");
     date.textContent = t("summaryDateLabel").replace(
       "{date}",
@@ -1080,7 +1140,11 @@ const renderSummary = (summaryItems) => {
     if (summary.type === "sticker") {
       content.append(average);
     }
-    content.append(capsuleEstimate, date);
+    if (hiddenEstimate) {
+      content.append(capsuleEstimate, hiddenEstimate, date);
+    } else {
+      content.append(capsuleEstimate, date);
+    }
 
     const aside = document.createElement("div");
     aside.className = "summary-aside";
@@ -1289,6 +1353,7 @@ const updateCollectionSuggestions = () => {
 };
 
 const addCollectionStickers = (collection) => {
+  selectedStickerCollection = collection;
   const rarities = getActiveRarities();
   stickersData
     .filter((sticker) => {
@@ -1385,6 +1450,7 @@ const updateKeychainCollectionSuggestions = () => {
 };
 
 const addCollectionKeychains = (collection) => {
+  selectedKeychainCollection = collection;
   keychainsData
     .filter((keychain) => keychainHasCollection(keychain, collection))
     .forEach((keychain) => {
@@ -1402,10 +1468,12 @@ keychainCollectionSearchInput.addEventListener(
 );
 clearStickersButton.addEventListener("click", () => {
   selectedStickerMap.clear();
+  selectedStickerCollection = null;
   renderSelectedStickers([]);
 });
 clearKeychainsButton.addEventListener("click", () => {
   selectedKeychainMap.clear();
+  selectedKeychainCollection = null;
   renderSelectedKeychains([]);
 });
 
@@ -1662,6 +1730,7 @@ runBtn.addEventListener("click", () => {
             gradeMultiplier,
             collectionCount,
             capsuleEstimate,
+            hiddenEstimate: null,
             date: new Date().toISOString()
           });
         }
@@ -1723,6 +1792,7 @@ runBtn.addEventListener("click", () => {
             gradeMultiplier,
             collectionCount,
             capsuleEstimate,
+            hiddenEstimate: null,
             date: new Date().toISOString()
           });
         }
@@ -1736,6 +1806,7 @@ runBtn.addEventListener("click", () => {
   runSequential().finally(() => {
     runBtn.disabled = false;
     stopBtn.disabled = true;
+    applyHiddenEstimates();
     renderSummary(summaryItems);
     downloadCsvButton.disabled = summaryItems.length === 0;
     if (downloadImagesButton) {
