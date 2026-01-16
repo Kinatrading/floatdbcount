@@ -36,6 +36,7 @@ const progressMeta = document.getElementById("progress-meta");
 const rateLimitDisplay = document.getElementById("rate-limit");
 const globalRateLimitDisplay = document.getElementById("rate-limit-global");
 const downloadCsvButton = document.getElementById("download-csv");
+const downloadImagesButton = document.getElementById("download-images");
 const languageSelect = document.getElementById("language-select");
 const themeToggle = document.getElementById("theme-toggle");
 
@@ -78,6 +79,7 @@ const translations = {
     resultsLabel: "Посилання та кількість:",
     summaryLabel: "Збережений підсумок:",
     downloadCsv: "Завантажити CSV",
+    downloadImages: "Завантажити всі картинки",
     exportImage: "Експорт картинки",
     exportTitle: "CS2 STICKER HIGHLIGHT",
     exportTotalLabel: "ЗАГАЛЬНО ПОКЛЕЄНО",
@@ -145,6 +147,7 @@ const translations = {
     resultsLabel: "Links and count:",
     summaryLabel: "Saved summary:",
     downloadCsv: "Download CSV",
+    downloadImages: "Download all images",
     exportImage: "Export image",
     exportTitle: "CS2 STICKER HIGHLIGHT",
     exportTotalLabel: "TOTAL POOLS",
@@ -181,6 +184,7 @@ let currentTheme = "light";
 let summaryItems = [];
 let progressTotal = 0;
 let isPaused = false;
+let isDownloadingAllImages = false;
 let resumeTimerId = null;
 let pausePromise = null;
 let pausePromiseResolve = null;
@@ -444,6 +448,8 @@ const waitForImage = (image) =>
     image.onerror = () => resolve();
   });
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const isSteamImageUrl = (url) =>
   typeof url === "string" &&
   url.startsWith("https://community.akamai.steamstatic.com/economy/image/");
@@ -534,6 +540,29 @@ const exportSummaryImage = async (summary, element) => {
       }
     }
     element.classList.remove("is-exporting");
+  }
+};
+
+const exportAllSummaryImages = async () => {
+  if (summaryItems.length === 0 || isDownloadingAllImages) {
+    return;
+  }
+  isDownloadingAllImages = true;
+  if (downloadImagesButton) {
+    downloadImagesButton.disabled = true;
+  }
+  const elements = Array.from(summaryList.querySelectorAll(".summary-item"));
+  for (let index = 0; index < summaryItems.length; index += 1) {
+    const element = elements[index];
+    if (!element) {
+      continue;
+    }
+    await exportSummaryImage(summaryItems[index], element);
+    await delay(150);
+  }
+  isDownloadingAllImages = false;
+  if (downloadImagesButton) {
+    downloadImagesButton.disabled = summaryItems.length === 0;
   }
 };
 
@@ -879,6 +908,9 @@ const renderKeychainResults = (keychain, item) => {
 const renderSummary = (summaryItems) => {
   summaryList.innerHTML = "";
   downloadCsvButton.disabled = summaryItems.length === 0;
+  if (downloadImagesButton) {
+    downloadImagesButton.disabled = summaryItems.length === 0 || isDownloadingAllImages;
+  }
   if (summaryItems.length === 0) {
     const empty = document.createElement("div");
     empty.className = "summary-item";
@@ -1289,6 +1321,12 @@ downloadCsvButton.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
+if (downloadImagesButton) {
+  downloadImagesButton.addEventListener("click", () => {
+    exportAllSummaryImages();
+  });
+}
+
 languageSelect.addEventListener("change", (event) => {
   currentLanguage = event.target.value;
   applyTranslations();
@@ -1416,9 +1454,13 @@ runBtn.addEventListener("click", () => {
   generatedLink.href = "#";
   generatedLink.textContent = "—";
   summaryItems = [];
+  isDownloadingAllImages = false;
   progressTotal = selectedItems.length;
   updateProgress(0, progressTotal);
   downloadCsvButton.disabled = true;
+  if (downloadImagesButton) {
+    downloadImagesButton.disabled = true;
+  }
   runBtn.disabled = true;
   stopBtn.disabled = false;
   let stopRequested = false;
@@ -1582,6 +1624,9 @@ runBtn.addEventListener("click", () => {
     stopBtn.disabled = true;
     renderSummary(summaryItems);
     downloadCsvButton.disabled = summaryItems.length === 0;
+    if (downloadImagesButton) {
+      downloadImagesButton.disabled = summaryItems.length === 0 || isDownloadingAllImages;
+    }
   });
 });
 
