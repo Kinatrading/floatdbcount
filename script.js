@@ -101,6 +101,9 @@ const translations = {
     downloadCsvName: "sticker-summary.csv",
     csvStickerHeader: "Предмет",
     csvAverageHeader: "Середня кількість на скін",
+    csvGradeMultiplierHeader: "Множник грейду",
+    csvCollectionCountHeader: "Кількість у колекції",
+    csvEstimateHeader: "Оцінка відкриттів",
     capsuleEstimateLabel: "Приблизна кількість відкритих капсул: {value}",
     keychainEstimateLabel: "Приблизна кількість відкритих брелоків: {value}"
   },
@@ -165,6 +168,9 @@ const translations = {
     downloadCsvName: "sticker-summary.csv",
     csvStickerHeader: "Item",
     csvAverageHeader: "Average per skin",
+    csvGradeMultiplierHeader: "Grade multiplier",
+    csvCollectionCountHeader: "Collection count",
+    csvEstimateHeader: "Openings estimate",
     capsuleEstimateLabel: "Approx opened capsules: {value}",
     keychainEstimateLabel: "Approx opened keychains: {value}"
   }
@@ -397,6 +403,9 @@ const buildCsv = (items) => {
     "5x",
     t("summaryTotalLabel").replace("{total}", "").trim(),
     t("csvAverageHeader"),
+    t("csvGradeMultiplierHeader"),
+    t("csvCollectionCountHeader"),
+    t("csvEstimateHeader"),
     t("summaryDateLabel").replace("{date}", "").trim()
   ];
   const rows = items.map((item) => [
@@ -408,6 +417,9 @@ const buildCsv = (items) => {
     item.pureCounts[4],
     item.total,
     item.average == null ? "" : formatAverageStickerValue(item.average),
+    item.gradeMultiplier == null ? "" : formatLocaleNumber(item.gradeMultiplier),
+    item.collectionCount == null ? "" : formatLocaleNumber(item.collectionCount),
+    item.capsuleEstimate == null ? "" : formatLocaleNumber(item.capsuleEstimate),
     formatLocaleDate(item.date)
   ]);
   return [headers, ...rows]
@@ -457,115 +469,50 @@ const fetchSteamImageBlob = (url) =>
     });
   });
 
-const exportSummaryImage = async (summary) => {
+const exportSummaryImage = async (summary, element) => {
   if (typeof html2canvas === "undefined") {
     return;
   }
-  const counts = summary.pureCounts || [];
-  const posterRoot = document.createElement("div");
-  posterRoot.className = "poster-root";
-
-  const poster = document.createElement("div");
-  poster.className = "poster";
-
-  const header = document.createElement("div");
-  header.className = "poster-header";
-  header.textContent = t("exportTitle");
-
-  const name = document.createElement("div");
-  name.className = "poster-name";
-  name.textContent = summary.title || summary.name;
-
-  const imageWrap = document.createElement("div");
-  imageWrap.className = "poster-image";
-
-  const image = document.createElement("img");
-  image.className = "poster-sticker";
-  image.alt = summary.title || summary.name;
-  image.crossOrigin = "anonymous";
-  image.referrerPolicy = "no-referrer";
-  let posterImageUrl = summary.image || "";
+  if (!element) {
+    return;
+  }
+  const image = element.querySelector("img.summary-image");
   let blobUrl = null;
-  if (isSteamImageUrl(posterImageUrl)) {
-    const blob = await fetchSteamImageBlob(posterImageUrl);
+  if (image && isSteamImageUrl(image.src)) {
+    const blob = await fetchSteamImageBlob(image.src);
     if (blob) {
       blobUrl = URL.createObjectURL(blob);
-      posterImageUrl = blobUrl;
+      image.src = blobUrl;
     }
   }
-  image.src = posterImageUrl;
-  imageWrap.appendChild(image);
-
-  const stats = document.createElement("div");
-  stats.className = "poster-stats";
-
-  const countBlock = document.createElement("div");
-  countBlock.className = "poster-counts";
-
-  const countMain = document.createElement("div");
-  countMain.className = "poster-counts-main";
-  countMain.textContent = `1 / ${formatLocaleNumber(counts[0] || 0)}`;
-
-  const countSecondary = document.createElement("div");
-  countSecondary.className = "poster-counts-sub";
-  countSecondary.textContent = `2 / ${formatLocaleNumber(counts[1] || 0)} - 3 / ${formatLocaleNumber(
-    counts[2] || 0
-  )}`;
-
-  const countThird = document.createElement("div");
-  countThird.className = "poster-counts-sub";
-  countThird.textContent = `4 / ${formatLocaleNumber(counts[3] || 0)} - 5 / ${formatLocaleNumber(
-    counts[4] || 0
-  )}`;
-
-  countBlock.append(countMain, countSecondary, countThird);
-
-  const totalBlock = document.createElement("div");
-  totalBlock.className = "poster-total";
-
-  const totalLabel = document.createElement("div");
-  totalLabel.className = "poster-total-label";
-  totalLabel.textContent = t("exportTotalLabel");
-
-  const totalValue = document.createElement("div");
-  totalValue.className = "poster-total-value";
-  totalValue.textContent = formatLocaleNumber(summary.total);
-
-  totalBlock.append(totalLabel, totalValue);
-  stats.append(countBlock, totalBlock);
-
-  const date = document.createElement("div");
-  date.className = "poster-date";
-  date.textContent = formatLocaleDate(summary.date);
-
-  poster.append(header, name, imageWrap, stats, date);
-  posterRoot.appendChild(poster);
-  document.body.appendChild(posterRoot);
-
+  element.classList.add("is-exporting");
   await waitForImage(image);
   if (document.fonts?.ready) {
     await document.fonts.ready;
   }
-
+  const backgroundColor = getComputedStyle(element).backgroundColor || "#ffffff";
   try {
-    const canvas = await html2canvas(poster, {
+    const canvas = await html2canvas(element, {
       useCORS: true,
       scale: 2,
-      backgroundColor: null
+      backgroundColor
     });
 
     const link = document.createElement("a");
     const fileBase = summary.title || summary.name || "sticker-summary";
-    link.download = `${sanitizeFileName(fileBase)}.png`;
-    link.href = canvas.toDataURL("image/png");
+    link.download = `${sanitizeFileName(fileBase)}.jpg`;
+    link.href = canvas.toDataURL("image/jpeg", 0.92);
     document.body.appendChild(link);
     link.click();
     link.remove();
   } finally {
     if (blobUrl) {
       URL.revokeObjectURL(blobUrl);
+      if (summary.image) {
+        image.src = summary.image;
+      }
     }
-    posterRoot.remove();
+    element.classList.remove("is-exporting");
   }
 };
 
@@ -1001,7 +948,7 @@ const renderSummary = (summaryItems) => {
     exportButton.className = "secondary-button summary-export";
     exportButton.textContent = t("exportImage");
     exportButton.addEventListener("click", () => {
-      exportSummaryImage(summary);
+      exportSummaryImage(summary, item);
     });
 
     aside.append(image, exportButton);
