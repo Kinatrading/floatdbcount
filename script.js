@@ -138,7 +138,8 @@ const translations = {
       "Приблизна кількість відкритих капсул (стосується лише предметів після 2020 року): {value}",
     keychainEstimateLabel:
       "Приблизна кількість відкритих брелоків (стосується лише предметів після 2020 року): {value}",
-    hiddenEstimateLabel: "Приблизно сховано цього предмета: {value}"
+    hiddenEstimateLabel: "Приблизно сховано цього предмета: {value}",
+    recheck: "Перевірити повторно"
   },
   en: {
     title: "CSFloat DB Sticker Linker created by Kina",
@@ -223,7 +224,8 @@ const translations = {
       "Approx opened capsules (items after 2020 only): {value}",
     keychainEstimateLabel:
       "Approx opened keychains (items after 2020 only): {value}",
-    hiddenEstimateLabel: "Approx hidden for this item: {value}"
+    hiddenEstimateLabel: "Approx hidden for this item: {value}",
+    recheck: "Recheck"
   }
 };
 
@@ -242,6 +244,10 @@ let lastRateLimitPayload = null;
 let lastGlobalRateLimitPayload = null;
 let selectedStickerCollection = null;
 let selectedKeychainCollection = null;
+let runCounter = 0;
+let activeRunId = null;
+let stickerResultsCache = new Map();
+let keychainResultsCache = new Map();
 let summaryDisplaySettings = {
   image: true,
   title: true,
@@ -258,6 +264,11 @@ const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const formatFloat = (value) => Number(value).toFixed(6);
 
 const t = (key) => translations[currentLanguage]?.[key] ?? key;
+
+const nextRunId = () => {
+  runCounter += 1;
+  return `${Date.now()}-${runCounter}`;
+};
 
 const formatLocaleNumber = (value) =>
   Number(value).toLocaleString(currentLanguage === "uk" ? "uk-UA" : "en-US");
@@ -528,6 +539,16 @@ const waitForImage = (image) =>
   });
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const requestCounts = (urls, runId) =>
+  new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: "runCounts", urls, runId }, resolve);
+  });
+
+const stopCounts = (runId) =>
+  new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: "stopCounts", runId }, resolve);
+  });
 
 const isSteamImageUrl = (url) =>
   typeof url === "string" &&
@@ -1175,7 +1196,181 @@ const computeKeychainTotals = (item) => {
   };
 };
 
+const createStickerSummaryItem = (sticker, results) => {
+  const totals = computeStickerTotals(results);
+  if (!totals) {
+    return null;
+  }
+  const average = computeAverageStickersPerSkin(results);
+  const gradeMultiplier = GRADE_MULTIPLIERS[sticker.rarity?.name] ?? null;
+  const collectionName = getStickerPrimaryCollectionName(sticker);
+  const collectionCount = countStickersInCollectionByRarity(
+    collectionName,
+    sticker.rarity?.name
+  );
+  const capsuleEstimate =
+    gradeMultiplier == null || collectionCount == null
+      ? null
+      : totals.total * gradeMultiplier * collectionCount;
+  return {
+    type: "sticker",
+    name: sticker.name,
+    title: sticker.name,
+    defIndex: sticker.def_index,
+    image: sticker.image,
+    pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
+    total: totals.total,
+    average,
+    gradeMultiplier,
+    collectionCount,
+    capsuleEstimate,
+    hiddenEstimate: null,
+    date: new Date().toISOString()
+  };
+};
+
+const createKeychainSummaryItem = (keychain, result) => {
+  const totals = computeKeychainTotals(result);
+  if (!totals) {
+    return null;
+  }
+  const gradeMultiplier = GRADE_MULTIPLIERS[keychain.rarity?.name] ?? null;
+  const collectionName = getKeychainPrimaryCollectionName(keychain);
+  const collectionCount = countKeychainsInCollectionByRarity(
+    collectionName,
+    keychain.rarity?.name
+  );
+  const capsuleEstimate =
+    gradeMultiplier == null || collectionCount == null
+      ? null
+      : totals.total * gradeMultiplier * collectionCount;
+  return {
+    type: "keychain",
+    name: keychain.name,
+    title: keychain.name,
+    defIndex: keychain.def_index,
+    image: keychain.image,
+    pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
+    total: totals.total,
+    average: null,
+    gradeMultiplier,
+    collectionCount,
+    capsuleEstimate,
+    hiddenEstimate: null,
+    date: new Date().toISOString()
+  };
+};
+
+const upsertSummaryItem = (item) => {
+  const index = summaryItems.findIndex(
+    (existing) => existing.type === item.type && existing.defIndex === item.defIndex
+  );
+  if (index === -1) {
+    summaryItems.push(item);
+  } else {
+    summaryItems[index] = item;
+  }
+};
+
+const refreshSummaryDisplay = () => {
+  applyHiddenEstimates();
+  renderSummary(summaryItems);
+  downloadCsvButton.disabled = summaryItems.length === 0;
+  if (downloadImagesButton) {
+    downloadImagesButton.disabled = summaryItems.length === 0 || isDownloadingAllImages;
+  }
+  if (downloadCollageButton) {
+    downloadCollageButton.disabled = summaryItems.length === 0 || isDownloadingCollage;
+  }
+  if (downloadCollageHorizontalButton) {
+    downloadCollageHorizontalButton.disabled =
+      summaryItems.length === 0 || isDownloadingHorizontalCollage;
+  }
+};
+
+const createRecheckButton = (onClick) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "secondary-button recheck-button";
+  button.textContent = t("recheck");
+  button.addEventListener("click", async () => {
+    if (button.disabled) {
+      return;
+    }
+    button.disabled = true;
+    try {
+      await onClick();
+    } finally {
+      button.disabled = false;
+    }
+  });
+  return button;
+};
+
+const recheckStickerCount = async (sticker, count) => {
+  const cachedItems = stickerResultsCache.get(sticker.def_index) || [];
+  const existingItem =
+    cachedItems.find((item) => item.count === count) || {
+      count,
+      url: buildStickerUrl(sticker.def_index, count)
+    };
+  const updatedItems = cachedItems.length
+    ? cachedItems.map((item) =>
+        item.count === count ? { ...existingItem, ...item, loading: true } : item
+      )
+    : [existingItem];
+  renderStickerResults(sticker, updatedItems);
+  const response = await requestCounts([existingItem.url], nextRunId());
+  if (!response?.results?.length) {
+    renderStickerResults(
+      sticker,
+      updatedItems.map((item) =>
+        item.count === count ? { ...item, loading: false } : item
+      )
+    );
+    return;
+  }
+  const refreshedItem = {
+    ...existingItem,
+    url: response.results[0].url,
+    found: response.results[0].count,
+    loading: false
+  };
+  const mergedItems = updatedItems
+    .filter((item) => item.count !== count)
+    .concat(refreshedItem)
+    .sort((a, b) => a.count - b.count);
+  renderStickerResults(sticker, mergedItems);
+  const summaryItem = createStickerSummaryItem(sticker, mergedItems);
+  if (summaryItem) {
+    upsertSummaryItem(summaryItem);
+    refreshSummaryDisplay();
+  }
+};
+
+const recheckKeychain = async (keychain) => {
+  const url = buildKeychainUrl(keychain.def_index);
+  renderKeychainResults(keychain, { url, found: null, loading: true });
+  const response = await requestCounts([url], nextRunId());
+  if (!response?.results?.length) {
+    renderKeychainResults(keychain, { url, found: null, loading: false });
+    return;
+  }
+  const result = {
+    url: response.results[0].url,
+    found: response.results[0].count,
+    loading: false
+  };
+  renderKeychainResults(keychain, result);
+  const summaryItem = createKeychainSummaryItem(keychain, result);
+  if (summaryItem) {
+    upsertSummaryItem(summaryItem);
+    refreshSummaryDisplay();
+  }
+};
+
 const renderStickerResults = (sticker, items) => {
+  stickerResultsCache.set(sticker.def_index, items);
   const existing = resultsList.querySelector(
     `[data-sticker-id="${sticker.def_index}"]`
   );
@@ -1215,7 +1410,14 @@ const renderStickerResults = (sticker, items) => {
     link.target = "_blank";
     link.rel = "noreferrer";
 
-    listItem.append(meta, link);
+    const actions = document.createElement("div");
+    actions.className = "result-actions";
+    const recheckButton = createRecheckButton(() =>
+      recheckStickerCount(sticker, item.count)
+    );
+    actions.append(link, recheckButton);
+
+    listItem.append(meta, actions);
     block.appendChild(listItem);
   });
 
@@ -1241,6 +1443,7 @@ const renderStickerResults = (sticker, items) => {
 };
 
 const renderKeychainResults = (keychain, item) => {
+  keychainResultsCache.set(keychain.def_index, item);
   const existing = resultsList.querySelector(
     `[data-keychain-id="${keychain.def_index}"]`
   );
@@ -1279,7 +1482,12 @@ const renderKeychainResults = (keychain, item) => {
   link.target = "_blank";
   link.rel = "noreferrer";
 
-  listItem.append(meta, link);
+  const actions = document.createElement("div");
+  actions.className = "result-actions";
+  const recheckButton = createRecheckButton(() => recheckKeychain(keychain));
+  actions.append(link, recheckButton);
+
+  listItem.append(meta, actions);
   block.appendChild(listItem);
 
   const total = parseItemsFoundCount(item.found);
@@ -1951,9 +2159,14 @@ runBtn.addEventListener("click", () => {
   runBtn.disabled = true;
   stopBtn.disabled = false;
   let stopRequested = false;
-  stopBtn.onclick = () => {
+  activeRunId = nextRunId();
+  stopBtn.onclick = async () => {
     stopRequested = true;
     stopBtn.disabled = true;
+    setPauseState({ paused: false });
+    if (activeRunId) {
+      await stopCounts(activeRunId);
+    }
   };
   let processed = 0;
   const runSequential = async () => {
@@ -1985,12 +2198,10 @@ runBtn.addEventListener("click", () => {
 
         const response = stopRequested
           ? null
-          : await new Promise((resolve) => {
-              chrome.runtime.sendMessage(
-                { action: "runCounts", urls: urls.map((u) => u.url) },
-                resolve
-              );
-            });
+          : await requestCounts(
+              urls.map((u) => u.url),
+              activeRunId
+            );
 
         if (!response?.results) {
           renderStickerResults(
@@ -2010,34 +2221,9 @@ runBtn.addEventListener("click", () => {
         }));
         renderStickerResults(sticker, results);
 
-        const totals = computeStickerTotals(results);
-        if (totals) {
-          const average = computeAverageStickersPerSkin(results);
-          const gradeMultiplier = GRADE_MULTIPLIERS[sticker.rarity?.name] ?? null;
-          const collectionName = getStickerPrimaryCollectionName(sticker);
-          const collectionCount = countStickersInCollectionByRarity(
-            collectionName,
-            sticker.rarity?.name
-          );
-          const capsuleEstimate =
-            gradeMultiplier == null || collectionCount == null
-              ? null
-              : totals.total * gradeMultiplier * collectionCount;
-          summaryItems.push({
-            type: "sticker",
-            name: sticker.name,
-            title: sticker.name,
-            defIndex: sticker.def_index,
-            image: sticker.image,
-            pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
-            total: totals.total,
-            average,
-            gradeMultiplier,
-            collectionCount,
-            capsuleEstimate,
-            hiddenEstimate: null,
-            date: new Date().toISOString()
-          });
+        const summaryItem = createStickerSummaryItem(sticker, results);
+        if (summaryItem) {
+          summaryItems.push(summaryItem);
         }
       } else {
         const keychain = entry.data;
@@ -2052,12 +2238,7 @@ runBtn.addEventListener("click", () => {
 
         const response = stopRequested
           ? null
-          : await new Promise((resolve) => {
-              chrome.runtime.sendMessage(
-                { action: "runCounts", urls: [url] },
-                resolve
-              );
-            });
+          : await requestCounts([url], activeRunId);
 
         if (!response?.results?.length) {
           renderKeychainResults(keychain, { url, found: null, loading: false });
@@ -2073,33 +2254,9 @@ runBtn.addEventListener("click", () => {
         };
         renderKeychainResults(keychain, result);
 
-        const totals = computeKeychainTotals(result);
-        if (totals) {
-          const gradeMultiplier = GRADE_MULTIPLIERS[keychain.rarity?.name] ?? null;
-          const collectionName = getKeychainPrimaryCollectionName(keychain);
-          const collectionCount = countKeychainsInCollectionByRarity(
-            collectionName,
-            keychain.rarity?.name
-          );
-          const capsuleEstimate =
-            gradeMultiplier == null || collectionCount == null
-              ? null
-              : totals.total * gradeMultiplier * collectionCount;
-          summaryItems.push({
-            type: "keychain",
-            name: keychain.name,
-            title: keychain.name,
-            defIndex: keychain.def_index,
-            image: keychain.image,
-            pureCounts: totals.pureCounts.map((value, index) => value * (index + 1)),
-            total: totals.total,
-            average: null,
-            gradeMultiplier,
-            collectionCount,
-            capsuleEstimate,
-            hiddenEstimate: null,
-            date: new Date().toISOString()
-          });
+        const summaryItem = createKeychainSummaryItem(keychain, result);
+        if (summaryItem) {
+          summaryItems.push(summaryItem);
         }
       }
 
@@ -2111,20 +2268,8 @@ runBtn.addEventListener("click", () => {
   runSequential().finally(() => {
     runBtn.disabled = false;
     stopBtn.disabled = true;
-    applyHiddenEstimates();
-    renderSummary(summaryItems);
-    downloadCsvButton.disabled = summaryItems.length === 0;
-    if (downloadImagesButton) {
-      downloadImagesButton.disabled = summaryItems.length === 0 || isDownloadingAllImages;
-    }
-    if (downloadCollageButton) {
-      downloadCollageButton.disabled =
-        summaryItems.length === 0 || isDownloadingCollage;
-    }
-    if (downloadCollageHorizontalButton) {
-      downloadCollageHorizontalButton.disabled =
-        summaryItems.length === 0 || isDownloadingHorizontalCollage;
-    }
+    activeRunId = null;
+    refreshSummaryDisplay();
   });
 });
 
