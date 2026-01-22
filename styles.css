@@ -677,6 +677,18 @@ button:disabled {
   background: #f0f2f8;
 }
 
+.result-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recheck-button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
 .result-meta {
   display: flex;
   justify-content: space-between;

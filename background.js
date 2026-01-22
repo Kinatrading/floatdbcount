@@ -4,6 +4,8 @@ chrome.action.onClicked.addListener(() => {
   });
 });
 
+const activeRuns = new Map();
+
 const RATE_LIMIT_DEFAULT = 125;
 const GLOBAL_RATE_LIMIT_DEFAULT = 50000;
 
@@ -170,28 +172,99 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   (async () => {
+    const runId = message.runId || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    if (!activeRuns.has(runId)) {
+      activeRuns.set(runId, { cancelled: false, currentTabId: null });
+    } else {
+      activeRuns.get(runId).cancelled = false;
+      activeRuns.get(runId).currentTabId = null;
+    }
+    const runState = activeRuns.get(runId);
     const results = [];
+    let wasCancelled = false;
     for (const url of message.urls) {
+      if (runState.cancelled) {
+        wasCancelled = true;
+        break;
+      }
       const tab = await chrome.tabs.create({ url, active: false });
+      runState.currentTabId = tab.id;
+      if (runState.cancelled) {
+        wasCancelled = true;
+        try {
+          await chrome.tabs.remove(tab.id);
+        } catch (error) {
+          // ignore
+        }
+        break;
+      }
       await new Promise((resolve) => {
         const listener = (tabId, info) => {
           if (tabId === tab.id && info.status === "complete") {
-            chrome.tabs.onUpdated.removeListener(listener);
+            cleanup();
             resolve();
           }
         };
+        const removalListener = (tabId) => {
+          if (tabId === tab.id) {
+            cleanup();
+            resolve();
+          }
+        };
+        const cleanup = () => {
+          chrome.tabs.onUpdated.removeListener(listener);
+          chrome.tabs.onRemoved.removeListener(removalListener);
+        };
         chrome.tabs.onUpdated.addListener(listener);
+        chrome.tabs.onRemoved.addListener(removalListener);
       });
 
-      const count = await waitForCountInTab(tab.id);
+      let count = null;
+      try {
+        if (runState.cancelled) {
+          wasCancelled = true;
+        } else {
+          count = await waitForCountInTab(tab.id);
+        }
+      } catch (error) {
+        count = null;
+      }
       results.push({ url, count });
-      await chrome.tabs.remove(tab.id);
+      try {
+        await chrome.tabs.remove(tab.id);
+      } catch (error) {
+        // ignore
+      }
+      runState.currentTabId = null;
+      if (runState.cancelled) {
+        wasCancelled = true;
+        break;
+      }
     }
 
-    sendResponse({ results });
+    activeRuns.delete(runId);
+    sendResponse(wasCancelled ? { cancelled: true, results: null } : { results });
   })();
 
   return true;
+});
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.action !== "stopCounts" || !message.runId) {
+    return;
+  }
+
+  if (!activeRuns.has(message.runId)) {
+    sendResponse({ ok: false });
+    return;
+  }
+
+  const runState = activeRuns.get(message.runId);
+  runState.cancelled = true;
+  if (runState.currentTabId != null) {
+    chrome.tabs.remove(runState.currentTabId).catch(() => {});
+  }
+  sendResponse({ ok: true });
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
