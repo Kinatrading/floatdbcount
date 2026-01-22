@@ -246,6 +246,8 @@ let selectedStickerCollection = null;
 let selectedKeychainCollection = null;
 let runCounter = 0;
 let activeRunId = null;
+let stickerResultsCache = new Map();
+let keychainResultsCache = new Map();
 let summaryDisplaySettings = {
   image: true,
   title: true,
@@ -1305,34 +1307,41 @@ const createRecheckButton = (onClick) => {
   return button;
 };
 
-const recheckSticker = async (sticker) => {
-  const urls = [1, 2, 3, 4, 5].map((count) => ({
-    count,
-    url: buildStickerUrl(sticker.def_index, count)
-  }));
-  renderStickerResults(
-    sticker,
-    urls.map((item) => ({ ...item, found: null, loading: true }))
-  );
-  const response = await requestCounts(
-    urls.map((u) => u.url),
-    nextRunId()
-  );
-  if (!response?.results) {
+const recheckStickerCount = async (sticker, count) => {
+  const cachedItems = stickerResultsCache.get(sticker.def_index) || [];
+  const existingItem =
+    cachedItems.find((item) => item.count === count) || {
+      count,
+      url: buildStickerUrl(sticker.def_index, count)
+    };
+  const updatedItems = cachedItems.length
+    ? cachedItems.map((item) =>
+        item.count === count ? { ...existingItem, ...item, loading: true } : item
+      )
+    : [existingItem];
+  renderStickerResults(sticker, updatedItems);
+  const response = await requestCounts([existingItem.url], nextRunId());
+  if (!response?.results?.length) {
     renderStickerResults(
       sticker,
-      urls.map((item) => ({ ...item, found: null, loading: false }))
+      updatedItems.map((item) =>
+        item.count === count ? { ...item, loading: false } : item
+      )
     );
     return;
   }
-  const results = response.results.map((result, index) => ({
-    count: index + 1,
-    url: result.url,
-    found: result.count,
+  const refreshedItem = {
+    ...existingItem,
+    url: response.results[0].url,
+    found: response.results[0].count,
     loading: false
-  }));
-  renderStickerResults(sticker, results);
-  const summaryItem = createStickerSummaryItem(sticker, results);
+  };
+  const mergedItems = updatedItems
+    .filter((item) => item.count !== count)
+    .concat(refreshedItem)
+    .sort((a, b) => a.count - b.count);
+  renderStickerResults(sticker, mergedItems);
+  const summaryItem = createStickerSummaryItem(sticker, mergedItems);
   if (summaryItem) {
     upsertSummaryItem(summaryItem);
     refreshSummaryDisplay();
@@ -1361,6 +1370,7 @@ const recheckKeychain = async (keychain) => {
 };
 
 const renderStickerResults = (sticker, items) => {
+  stickerResultsCache.set(sticker.def_index, items);
   const existing = resultsList.querySelector(
     `[data-sticker-id="${sticker.def_index}"]`
   );
@@ -1402,7 +1412,9 @@ const renderStickerResults = (sticker, items) => {
 
     const actions = document.createElement("div");
     actions.className = "result-actions";
-    const recheckButton = createRecheckButton(() => recheckSticker(sticker));
+    const recheckButton = createRecheckButton(() =>
+      recheckStickerCount(sticker, item.count)
+    );
     actions.append(link, recheckButton);
 
     listItem.append(meta, actions);
@@ -1431,6 +1443,7 @@ const renderStickerResults = (sticker, items) => {
 };
 
 const renderKeychainResults = (keychain, item) => {
+  keychainResultsCache.set(keychain.def_index, item);
   const existing = resultsList.querySelector(
     `[data-keychain-id="${keychain.def_index}"]`
   );
