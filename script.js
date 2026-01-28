@@ -33,6 +33,7 @@ const resultsList = document.getElementById("results-list");
 const summaryList = document.getElementById("summary-list");
 const progressBar = document.getElementById("progress-bar");
 const progressMeta = document.getElementById("progress-meta");
+const progressEstimate = document.getElementById("progress-estimate");
 const rateLimitDisplay = document.getElementById("rate-limit");
 const globalRateLimitDisplay = document.getElementById("rate-limit-global");
 const downloadCsvButton = document.getElementById("download-csv");
@@ -53,6 +54,7 @@ const summaryShowHiddenEstimateCheckbox = document.getElementById(
   "summary-show-hidden-estimate"
 );
 const summaryShowDateCheckbox = document.getElementById("summary-show-date");
+const retryFailedCheckbox = document.getElementById("retry-failed");
 
 const translations = {
   uk: {
@@ -89,6 +91,10 @@ const translations = {
     run: "Run",
     stop: "Stop",
     progressLabel: "Прогрес обробки:",
+    estimatedTimeLabel: "Очікуваний час:",
+    runSettingsLabel: "Налаштування запуску:",
+    runSettingsAria: "Налаштування запуску",
+    retryFailedLabel: "Повторно перевіряти биті посилання після завершення",
     generatedLink: "Згенероване посилання:",
     resultsLabel: "Посилання та кількість:",
     summaryLabel: "Збережений підсумок:",
@@ -175,6 +181,10 @@ const translations = {
     run: "Run",
     stop: "Stop",
     progressLabel: "Processing progress:",
+    estimatedTimeLabel: "Estimated time:",
+    runSettingsLabel: "Run settings:",
+    runSettingsAria: "Run settings",
+    retryFailedLabel: "Retry failed links after finishing",
     generatedLink: "Generated link:",
     resultsLabel: "Links and count:",
     summaryLabel: "Saved summary:",
@@ -246,6 +256,7 @@ let selectedStickerCollection = null;
 let selectedKeychainCollection = null;
 let runCounter = 0;
 let activeRunId = null;
+let estimatedLinksTotal = 0;
 let stickerResultsCache = new Map();
 let keychainResultsCache = new Map();
 let summaryDisplaySettings = {
@@ -301,6 +312,87 @@ const formatAverageStickerValue = (value) =>
 const formatLocaleDate = (value) =>
   new Date(value).toLocaleString(currentLanguage === "uk" ? "uk-UA" : "en-US");
 
+const formatDurationLabel = (totalMs) => {
+  const totalMinutes = Math.max(Math.round(totalMs / 60000), 0);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [];
+  if (hours > 0) {
+    parts.push(
+      currentLanguage === "uk" ? `${hours} год` : `${hours}h`
+    );
+  }
+  if (minutes > 0 || parts.length === 0) {
+    parts.push(
+      currentLanguage === "uk" ? `${minutes} хв` : `${minutes}m`
+    );
+  }
+  return parts.join(" ");
+};
+
+const getNextHourStart = (baseMs = Date.now()) => {
+  const nextHour = new Date(baseMs);
+  nextHour.setMinutes(0, 0, 0);
+  nextHour.setHours(nextHour.getHours() + 1);
+  return nextHour;
+};
+
+const estimateProcessingMs = (totalLinks, secondsPerLink, startMs = Date.now()) => {
+  if (!Number.isFinite(totalLinks) || totalLinks <= 0) {
+    return 0;
+  }
+  const perLinkMs = secondsPerLink * 1000;
+  const hourlyLimit = 105;
+  let remaining = totalLinks;
+  let currentMs = startMs;
+  let elapsedMs = 0;
+
+  while (remaining > 0) {
+    const nextHour = getNextHourStart(currentMs);
+    const timeLeftMs = nextHour.getTime() - currentMs;
+    const capacityByTime = Math.floor(timeLeftMs / perLinkMs);
+    const capacity = Math.min(hourlyLimit, capacityByTime);
+
+    if (capacity <= 0) {
+      elapsedMs += timeLeftMs;
+      currentMs = nextHour.getTime();
+      continue;
+    }
+
+    const toProcess = Math.min(remaining, capacity);
+    const batchMs = toProcess * perLinkMs;
+    elapsedMs += batchMs;
+    currentMs += batchMs;
+    remaining -= toProcess;
+
+    if (remaining > 0) {
+      const waitMs = nextHour.getTime() - currentMs;
+      if (waitMs > 0) {
+        elapsedMs += waitMs;
+        currentMs = nextHour.getTime();
+      }
+    }
+  }
+
+  return elapsedMs;
+};
+
+const updateProgressEstimate = (totalLinks) => {
+  if (!progressEstimate) {
+    return;
+  }
+  if (!Number.isFinite(totalLinks) || totalLinks <= 0) {
+    progressEstimate.textContent = "—";
+    return;
+  }
+  const now = Date.now();
+  const minMs = estimateProcessingMs(totalLinks, 7, now);
+  const maxMs = estimateProcessingMs(totalLinks, 15, now);
+  progressEstimate.textContent = `${formatDurationLabel(minMs)} — ${formatDurationLabel(
+    maxMs
+  )}`;
+};
+
 const updateThemeToggleLabel = () => {
   if (!themeToggle) {
     return;
@@ -350,6 +442,7 @@ const applyTranslations = () => {
   if (lastGlobalRateLimitPayload) {
     updateGlobalRateLimitDisplay(lastGlobalRateLimitPayload);
   }
+  updateProgressEstimate(estimatedLinksTotal);
   updateThemeToggleLabel();
 };
 
@@ -452,6 +545,81 @@ const waitForResumeIfPaused = async () => {
     return;
   }
   await pausePromise;
+};
+
+const countTotalLinks = (items) =>
+  items.reduce((sum, entry) => sum + (entry.type === "sticker" ? 5 : 1), 0);
+
+const mergeRetryResults = (items, response) => {
+  const resultMap = new Map(
+    (response?.results || []).map((result) => [result.url, result.count])
+  );
+  return items.map((item) => {
+    if (!item.loading) {
+      return item;
+    }
+    const nextFound = resultMap.has(item.url) ? resultMap.get(item.url) : item.found;
+    return {
+      ...item,
+      found: nextFound,
+      loading: false
+    };
+  });
+};
+
+const retryFailedItems = async (selectedItems, stopRequestedRef) => {
+  for (const entry of selectedItems) {
+    if (stopRequestedRef.stopRequested) {
+      break;
+    }
+    await waitForResumeIfPaused();
+    if (stopRequestedRef.stopRequested) {
+      break;
+    }
+
+    if (entry.type === "sticker") {
+      const sticker = entry.data;
+      const cachedItems = stickerResultsCache.get(sticker.def_index) || [];
+      const failedItems = cachedItems.filter((item) => item.found === null);
+      if (failedItems.length === 0) {
+        continue;
+      }
+      const markedItems = cachedItems.map((item) =>
+        item.found === null ? { ...item, loading: true } : item
+      );
+      renderStickerResults(sticker, markedItems);
+      const response = stopRequestedRef.stopRequested
+        ? null
+        : await requestCounts(
+            failedItems.map((item) => item.url),
+            activeRunId
+          );
+      const mergedItems = mergeRetryResults(markedItems, response);
+      renderStickerResults(sticker, mergedItems);
+      const summaryItem = createStickerSummaryItem(sticker, mergedItems);
+      if (summaryItem) {
+        upsertSummaryItem(summaryItem);
+      }
+    } else {
+      const keychain = entry.data;
+      const cachedItem = keychainResultsCache.get(keychain.def_index);
+      if (!cachedItem || cachedItem.found !== null) {
+        continue;
+      }
+      renderKeychainResults(keychain, { ...cachedItem, loading: true });
+      const response = stopRequestedRef.stopRequested
+        ? null
+        : await requestCounts([cachedItem.url], activeRunId);
+      const mergedItems = mergeRetryResults([{ ...cachedItem, loading: true }], response);
+      const nextItem = mergedItems[0] || { ...cachedItem, loading: false };
+      renderKeychainResults(keychain, nextItem);
+      const summaryItem = createKeychainSummaryItem(keychain, nextItem);
+      if (summaryItem) {
+        upsertSummaryItem(summaryItem);
+      }
+    }
+    refreshSummaryDisplay();
+  }
 };
 
 const initCardToggles = () => {
@@ -2145,6 +2313,8 @@ runBtn.addEventListener("click", () => {
   isDownloadingCollage = false;
   isDownloadingHorizontalCollage = false;
   progressTotal = selectedItems.length;
+  estimatedLinksTotal = countTotalLinks(selectedItems);
+  updateProgressEstimate(estimatedLinksTotal);
   updateProgress(0, progressTotal);
   downloadCsvButton.disabled = true;
   if (downloadImagesButton) {
@@ -2158,10 +2328,10 @@ runBtn.addEventListener("click", () => {
   }
   runBtn.disabled = true;
   stopBtn.disabled = false;
-  let stopRequested = false;
+  const stopRequestedRef = { stopRequested: false };
   activeRunId = nextRunId();
   stopBtn.onclick = async () => {
-    stopRequested = true;
+    stopRequestedRef.stopRequested = true;
     stopBtn.disabled = true;
     setPauseState({ paused: false });
     if (activeRunId) {
@@ -2171,11 +2341,11 @@ runBtn.addEventListener("click", () => {
   let processed = 0;
   const runSequential = async () => {
     for (const entry of selectedItems) {
-      if (stopRequested) {
+      if (stopRequestedRef.stopRequested) {
         break;
       }
       await waitForResumeIfPaused();
-      if (stopRequested) {
+      if (stopRequestedRef.stopRequested) {
         break;
       }
 
@@ -2196,7 +2366,7 @@ runBtn.addEventListener("click", () => {
           urls.map((item) => ({ ...item, found: null, loading: true }))
         );
 
-        const response = stopRequested
+        const response = stopRequestedRef.stopRequested
           ? null
           : await requestCounts(
               urls.map((u) => u.url),
@@ -2236,7 +2406,7 @@ runBtn.addEventListener("click", () => {
 
         renderKeychainResults(keychain, { url, found: null, loading: true });
 
-        const response = stopRequested
+        const response = stopRequestedRef.stopRequested
           ? null
           : await requestCounts([url], activeRunId);
 
@@ -2262,6 +2432,10 @@ runBtn.addEventListener("click", () => {
 
       processed += 1;
       updateProgress(processed, progressTotal);
+    }
+
+    if (!stopRequestedRef.stopRequested && retryFailedCheckbox?.checked) {
+      await retryFailedItems(selectedItems, stopRequestedRef);
     }
   };
 
