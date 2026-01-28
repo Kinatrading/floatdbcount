@@ -227,8 +227,28 @@
               ></div>
             </div>
             <div class="progress-meta" id="progress-meta">0 / 0</div>
+            <div class="progress-meta">
+              <span data-i18n="estimatedTimeLabel">Очікуваний час:</span>
+              <span id="progress-estimate">—</span>
+            </div>
             <div class="rate-limit" id="rate-limit">—</div>
             <div class="rate-limit" id="rate-limit-global">—</div>
+          </div>
+          <div class="output">
+            <span data-i18n="runSettingsLabel">Налаштування запуску:</span>
+            <div
+              class="checkbox-grid"
+              role="group"
+              aria-label="Налаштування запуску"
+              data-i18n-aria="runSettingsAria"
+            >
+              <label class="checkbox">
+                <input type="checkbox" id="retry-failed" />
+                <span data-i18n="retryFailedLabel">
+                  Повторно перевіряти биті посилання після завершення
+                </span>
+              </label>
+            </div>
           </div>
           <div class="output">
             <span data-i18n="generatedLink">Згенероване посилання:</span>
