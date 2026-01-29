@@ -59,6 +59,10 @@ const buildRateLimitPayload = (headers = [], defaultLimit) => {
 
 chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
+    // Do nothing unless a counting run is active (prevents work on normal CSFloat page refresh).
+    if (activeRuns.size === 0) {
+      return;
+    }
     const payload = buildRateLimitPayload(
       details.responseHeaders || [],
       RATE_LIMIT_DEFAULT
@@ -77,6 +81,10 @@ chrome.webRequest.onHeadersReceived.addListener(
 
 chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
+    // Do nothing unless a counting run is active (prevents work on normal CSFloat page refresh).
+    if (activeRuns.size === 0) {
+      return;
+    }
     const payload = buildRateLimitPayload(
       details.responseHeaders || [],
       GLOBAL_RATE_LIMIT_DEFAULT
