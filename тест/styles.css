@@ -63,6 +63,53 @@ p {
   min-width: 140px;
 }
 
+
+.module-switch {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 16px rgba(30, 37, 61, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.module-switch-label {
+  font-size: 13px;
+  color: #4b5262;
+}
+
+.module-switch-buttons {
+  display: inline-flex;
+  background: #e2e8f0;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.module-switch-button {
+  background: transparent;
+  color: #1b1e28;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.module-switch-button:hover {
+  background: rgba(30, 64, 175, 0.12);
+}
+
+.module-switch-button.is-active {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.module-switch-button.is-active:hover {
+  background: #1e40af;
+}
+
 .container {
   max-width: 720px;
   margin: 0 auto;
@@ -739,6 +786,28 @@ button:disabled {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
+
+:root[data-theme="dark"] .module-switch {
+  background: #171a24;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-theme="dark"] .module-switch-label {
+  color: #a6adbd;
+}
+
+:root[data-theme="dark"] .module-switch-buttons {
+  background: #232838;
+}
+
+:root[data-theme="dark"] .module-switch-button {
+  color: #e8eaf0;
+}
+
+:root[data-theme="dark"] .module-switch-button:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
 :root[data-theme="dark"] p {
   color: #a6adbd;
 }
@@ -904,6 +973,28 @@ button:disabled {
   :root:not([data-theme]) .card {
     background: #171a24;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  }
+
+
+  :root:not([data-theme]) .module-switch {
+    background: #171a24;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  }
+
+  :root:not([data-theme]) .module-switch-label {
+    color: #a6adbd;
+  }
+
+  :root:not([data-theme]) .module-switch-buttons {
+    background: #232838;
+  }
+
+  :root:not([data-theme]) .module-switch-button {
+    color: #e8eaf0;
+  }
+
+  :root:not([data-theme]) .module-switch-button:hover {
+    background: rgba(59, 130, 246, 0.2);
   }
 
   :root:not([data-theme]) p {

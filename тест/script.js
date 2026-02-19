@@ -53,6 +53,7 @@ const downloadCollageHorizontalButton = document.getElementById(
 );
 const languageSelect = document.getElementById("language-select");
 const themeToggle = document.getElementById("theme-toggle");
+const moduleSwitchButtons = Array.from(document.querySelectorAll(".module-switch-button"));
 const summaryShowImageCheckbox = document.getElementById("summary-show-image");
 const summaryShowTitleCheckbox = document.getElementById("summary-show-title");
 const summaryShowCountsCheckbox = document.getElementById("summary-show-counts");
@@ -73,6 +74,10 @@ const translations = {
     themeLabel: "Тема",
     themeToggleDark: "Темна тема",
     themeToggleLight: "Світла тема",
+    moduleSwitchLabel: "Модуль",
+    moduleSwitchAria: "Перемикач модулів",
+    moduleStickersCharms: "stickers/charms",
+    moduleSkins: "skins",
     categoryTitle: "Категорія предметів",
     categoryAll: "Усі",
     categoryAria: "Категорія",
@@ -128,6 +133,7 @@ const translations = {
     waiting: "Очікування...",
     notFound: "Не знайдено",
     totalStickersLabel: "Загальна кількість поклеєних стікерів:",
+    totalSkinsLabel: "Загальна кількість скінів:",
     averageStickersLabel: "Середня кількість:",
     totalKeychainsLabel: "Загальна кількість закріплених брелків:",
     summaryEmpty: "Підсумок буде доступний після запуску.",
@@ -163,6 +169,10 @@ const translations = {
     themeLabel: "Theme",
     themeToggleDark: "Dark theme",
     themeToggleLight: "Light theme",
+    moduleSwitchLabel: "Module",
+    moduleSwitchAria: "Module switch",
+    moduleStickersCharms: "stickers/charms",
+    moduleSkins: "skins",
     categoryTitle: "Item category",
     categoryAll: "All",
     categoryAria: "Category",
@@ -218,6 +228,7 @@ const translations = {
     waiting: "Waiting...",
     notFound: "Not found",
     totalStickersLabel: "Total applied stickers:",
+    totalSkinsLabel: "Total skins:",
     averageStickersLabel: "Average:",
     totalKeychainsLabel: "Total attached keychains:",
     summaryEmpty: "Summary will be available after running.",
@@ -250,6 +261,7 @@ const translations = {
 
 let currentLanguage = "uk";
 let currentTheme = "light";
+let currentModule = "stickers-charms";
 let summaryItems = [];
 let progressTotal = 0;
 let isPaused = false;
@@ -413,6 +425,40 @@ const updateThemeToggleLabel = () => {
   themeToggle.setAttribute("aria-pressed", String(currentTheme === "dark"));
 };
 
+const updateModuleSwitch = () => {
+  moduleSwitchButtons.forEach((button) => {
+    const isActive = button.dataset.module === currentModule;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+};
+
+const rerenderResultsFromCache = () => {
+  selectedStickerMap.forEach((sticker, defIndex) => {
+    const cachedItems = stickerResultsCache.get(defIndex);
+    if (cachedItems) {
+      renderStickerResults(sticker, cachedItems);
+    }
+  });
+
+  selectedKeychainMap.forEach((keychain, defIndex) => {
+    const cachedItem = keychainResultsCache.get(defIndex);
+    if (cachedItem) {
+      renderKeychainResults(keychain, cachedItem);
+    }
+  });
+};
+
+const setActiveModule = (module) => {
+  if (module !== "stickers-charms" && module !== "skins") {
+    return;
+  }
+  currentModule = module;
+  updateModuleSwitch();
+  rerenderResultsFromCache();
+  renderSummary(summaryItems);
+};
+
 const applyTranslations = () => {
   document.documentElement.lang = currentLanguage;
   document.querySelectorAll("[data-i18n]").forEach((element) => {
@@ -453,6 +499,7 @@ const applyTranslations = () => {
   }
   updateProgressEstimate(estimatedLinksTotal);
   updateThemeToggleLabel();
+  updateModuleSwitch();
 };
 
 const readSummaryDisplaySettings = () => ({
@@ -1520,12 +1567,20 @@ const renderStickerResults = (sticker, items) => {
 
   const totals = computeStickerTotals(items);
   const total = totals?.total ?? null;
+  const skinsCount = computeTotalSkins(items);
   const totalLabel = document.createElement("div");
   totalLabel.className = "sticker-total";
-  totalLabel.textContent =
-    total === null
-      ? `${t("totalStickersLabel")} —`
-      : `${t("totalStickersLabel")} ${formatLocaleNumber(total)}`;
+  if (currentModule === "skins") {
+    totalLabel.textContent =
+      skinsCount === null
+        ? `${t("totalSkinsLabel")} —`
+        : `${t("totalSkinsLabel")} ${formatLocaleNumber(skinsCount)}`;
+  } else {
+    totalLabel.textContent =
+      total === null
+        ? `${t("totalStickersLabel")} —`
+        : `${t("totalStickersLabel")} ${formatLocaleNumber(total)}`;
+  }
   block.appendChild(totalLabel);
 
   const average = computeAverageStickersPerSkin(items);
@@ -1650,10 +1705,17 @@ const renderSummary = (summaryItems) => {
       .replace("{c5}", formatLocaleNumber(summary.pureCounts[4]));
 
     const total = document.createElement("div");
-    total.textContent = t("summaryTotalLabel").replace(
-      "{total}",
-      formatLocaleNumber(summary.total)
-    );
+    if (summary.type === "sticker" && currentModule === "skins") {
+      total.textContent =
+        summary.skinsCount == null
+          ? `${t("totalSkinsLabel")} —`
+          : `${t("totalSkinsLabel")} ${formatLocaleNumber(summary.skinsCount)}`;
+    } else {
+      total.textContent = t("summaryTotalLabel").replace(
+        "{total}",
+        formatLocaleNumber(summary.total)
+      );
+    }
 
     const average = document.createElement("div");
     if (summary.type === "sticker") {
@@ -2374,6 +2436,12 @@ runBtn.addEventListener("click", () => {
     stopBtn.disabled = true;
     activeRunId = null;
     refreshSummaryDisplay();
+  });
+});
+
+moduleSwitchButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setActiveModule(button.dataset.module);
   });
 });
 
