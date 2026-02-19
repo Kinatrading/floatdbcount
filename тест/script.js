@@ -55,6 +55,7 @@ const downloadCollageHorizontalButton = document.getElementById(
 const languageSelect = document.getElementById("language-select");
 const themeToggle = document.getElementById("theme-toggle");
 const moduleSwitchButtons = Array.from(document.querySelectorAll(".module-switch-button"));
+const modulePanels = Array.from(document.querySelectorAll("[data-module-panel]"));
 const summaryShowImageCheckbox = document.getElementById("summary-show-image");
 const summaryShowTitleCheckbox = document.getElementById("summary-show-title");
 const summaryShowCountsCheckbox = document.getElementById("summary-show-counts");
@@ -439,6 +440,9 @@ const updateModuleSwitch = () => {
     const isActive = button.dataset.module === currentModule;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", String(isActive));
+  });
+  modulePanels.forEach((panel) => {
+    panel.hidden = panel.dataset.modulePanel !== currentModule;
   });
 };
 
@@ -2360,6 +2364,166 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
 }
 
 runBtn.addEventListener("click", () => {
+  if (currentModule === "stickers-charms") {
+    const selectedItems = [
+      ...[...selectedStickerMap.values()].map((sticker) => ({
+        type: "sticker",
+        data: sticker
+      })),
+      ...[...selectedKeychainMap.values()].map((keychain) => ({
+        type: "keychain",
+        data: keychain
+      }))
+    ];
+    if (selectedItems.length === 0) {
+      alert(t("alertSelect"));
+      return;
+    }
+
+    resultsList.innerHTML = "";
+    summaryList.innerHTML = "";
+    generatedLink.href = "#";
+    generatedLink.textContent = "—";
+    summaryItems = [];
+    isDownloadingAllImages = false;
+    isDownloadingCollage = false;
+    isDownloadingHorizontalCollage = false;
+    progressTotal = selectedItems.length;
+    estimatedLinksTotal = countTotalLinks(selectedItems);
+    updateProgressEstimate(estimatedLinksTotal);
+    updateProgress(0, progressTotal);
+    downloadCsvButton.disabled = true;
+    if (downloadImagesButton) {
+      downloadImagesButton.disabled = true;
+    }
+    if (downloadCollageButton) {
+      downloadCollageButton.disabled = true;
+    }
+    if (downloadCollageHorizontalButton) {
+      downloadCollageHorizontalButton.disabled = true;
+    }
+    runBtn.disabled = true;
+    stopBtn.disabled = false;
+    const stopRequestedRef = { stopRequested: false };
+    activeRunId = nextRunId();
+    stopBtn.onclick = async () => {
+      stopRequestedRef.stopRequested = true;
+      stopBtn.disabled = true;
+      setPauseState({ paused: false });
+      if (activeRunId) {
+        await stopCounts(activeRunId);
+      }
+    };
+    let processed = 0;
+    const runSequential = async () => {
+      for (const entry of selectedItems) {
+        if (stopRequestedRef.stopRequested) {
+          break;
+        }
+        await waitForResumeIfPaused();
+        if (stopRequestedRef.stopRequested) {
+          break;
+        }
+
+        if (entry.type === "sticker") {
+          const sticker = entry.data;
+          const urls = [1, 2, 3, 4, 5].map((count) => ({
+            count,
+            url: buildStickerUrl(sticker.def_index, count)
+          }));
+
+          if (generatedLink.textContent === "—") {
+            generatedLink.href = urls[0].url;
+            generatedLink.textContent = urls[0].url;
+          }
+
+          renderStickerResults(
+            sticker,
+            urls.map((item) => ({ ...item, found: null, loading: true }))
+          );
+
+          const response = stopRequestedRef.stopRequested
+            ? null
+            : await requestCounts(
+                urls.map((u) => u.url),
+                activeRunId
+              );
+
+          if (!response?.results) {
+            renderStickerResults(
+              sticker,
+              urls.map((item) => ({ ...item, found: null, loading: false }))
+            );
+            processed += 1;
+            updateProgress(processed, progressTotal);
+            continue;
+          }
+
+          const results = response.results.map((result, index) => ({
+            count: index + 1,
+            url: result.url,
+            found: result.count,
+            loading: false
+          }));
+          renderStickerResults(sticker, results);
+
+          const summaryItem = createStickerSummaryItem(sticker, results);
+          if (summaryItem) {
+            summaryItems.push(summaryItem);
+          }
+        } else {
+          const keychain = entry.data;
+          const url = buildKeychainUrl(keychain.def_index);
+
+          if (generatedLink.textContent === "—") {
+            generatedLink.href = url;
+            generatedLink.textContent = url;
+          }
+
+          renderKeychainResults(keychain, { url, found: null, loading: true });
+
+          const response = stopRequestedRef.stopRequested
+            ? null
+            : await requestCounts([url], activeRunId);
+
+          if (!response?.results?.length) {
+            renderKeychainResults(keychain, { url, found: null, loading: false });
+            processed += 1;
+            updateProgress(processed, progressTotal);
+            continue;
+          }
+
+          const result = {
+            url: response.results[0].url,
+            found: response.results[0].count,
+            loading: false
+          };
+          renderKeychainResults(keychain, result);
+
+          const summaryItem = createKeychainSummaryItem(keychain, result);
+          if (summaryItem) {
+            summaryItems.push(summaryItem);
+          }
+        }
+
+        processed += 1;
+        updateProgress(processed, progressTotal);
+      }
+
+      if (!stopRequestedRef.stopRequested && retryFailedCheckbox?.checked) {
+        await retryFailedItems(selectedItems, stopRequestedRef);
+      }
+    };
+
+    runSequential().finally(() => {
+      runBtn.disabled = false;
+      stopBtn.disabled = true;
+      activeRunId = null;
+      refreshSummaryDisplay();
+    });
+    return;
+  }
+
   const selectedCollectionId = collectionSelect?.value || "";
   if (!selectedCollectionId) {
     alert(t("alertSelect"));
@@ -2436,6 +2600,8 @@ moduleSwitchButtons.forEach((button) => {
 
 syncInputs(0, 1);
 initCardToggles();
+loadStickerData();
+loadKeychainData();
 loadSkinsData();
 currentTheme = localStorage.getItem("csfloat-theme") || getPreferredTheme();
 setTheme(currentTheme);
