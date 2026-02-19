@@ -22,6 +22,7 @@ const stickerSearchInput = document.getElementById("sticker-search");
 const stickerSuggestions = document.getElementById("sticker-suggestions");
 const collectionSearchInput = document.getElementById("collection-search");
 const collectionSuggestions = document.getElementById("collection-suggestions");
+const collectionSelect = document.getElementById("collection-select");
 const keychainSearchInput = document.getElementById("keychain-search");
 const keychainSuggestions = document.getElementById("keychain-suggestions");
 const keychainCollectionSearchInput = document.getElementById("keychain-collection-search");
@@ -78,6 +79,10 @@ const translations = {
     moduleSwitchAria: "Перемикач модулів",
     moduleStickersCharms: "stickers/charms",
     moduleSkins: "skins",
+    skinsCollectionTitle: "Колекція",
+    skinsCollectionSelectLabel: "Оберіть колекцію",
+    skinsCollectionSelectPlaceholder: "Оберіть колекцію",
+    skinsCollectionSelectAria: "Список колекцій скінів",
     categoryTitle: "Категорія предметів",
     categoryAll: "Усі",
     categoryAria: "Категорія",
@@ -139,7 +144,7 @@ const translations = {
     summaryEmpty: "Підсумок буде доступний після запуску.",
     selectedEmpty: "Нічого не обрано.",
     remove: "Видалити",
-    alertSelect: "Оберіть хоча б одну наліпку або брелок.",
+    alertSelect: "Оберіть колекцію.",
     summaryCountsLabel: "1х: {c1}, 2х: {c2}, 3х: {c3}, 4х: {c4}, 5х: {c5}",
     summaryKeychainCountsLabel: "1х: {c1}",
     summaryTotalLabel: "Сумарна кількість поклеєних: {total}",
@@ -173,6 +178,10 @@ const translations = {
     moduleSwitchAria: "Module switch",
     moduleStickersCharms: "stickers/charms",
     moduleSkins: "skins",
+    skinsCollectionTitle: "Collection",
+    skinsCollectionSelectLabel: "Choose collection",
+    skinsCollectionSelectPlaceholder: "Choose collection",
+    skinsCollectionSelectAria: "Skins collections list",
     categoryTitle: "Item category",
     categoryAll: "All",
     categoryAria: "Category",
@@ -234,7 +243,7 @@ const translations = {
     summaryEmpty: "Summary will be available after running.",
     selectedEmpty: "No items selected.",
     remove: "Remove",
-    alertSelect: "Select at least one sticker or keychain.",
+    alertSelect: "Select a collection.",
     summaryCountsLabel: "1x: {c1}, 2x: {c2}, 3x: {c3}, 4x: {c4}, 5x: {c5}",
     summaryKeychainCountsLabel: "1x: {c1}",
     summaryTotalLabel: "Total applied: {total}",
@@ -261,7 +270,7 @@ const translations = {
 
 let currentLanguage = "uk";
 let currentTheme = "light";
-let currentModule = "stickers-charms";
+let currentModule = "skins";
 let summaryItems = [];
 let progressTotal = 0;
 let isPaused = false;
@@ -1827,6 +1836,9 @@ const renderSummary = (summaryItems) => {
 };
 
 const renderSelectedStickers = (stickers) => {
+  if (!selectedStickersList) {
+    return;
+  }
   selectedStickersList.innerHTML = "";
   if (stickers.length === 0) {
     const empty = document.createElement("li");
@@ -1854,6 +1866,9 @@ const renderSelectedStickers = (stickers) => {
 };
 
 const renderSelectedKeychains = (keychains) => {
+  if (!selectedKeychainsList) {
+    return;
+  }
   selectedKeychainsList.innerHTML = "";
   if (keychains.length === 0) {
     const empty = document.createElement("li");
@@ -1886,6 +1901,8 @@ const selectedStickerMap = new Map();
 let keychainsData = [];
 let keychainCollectionsData = [];
 const selectedKeychainMap = new Map();
+let skinsData = [];
+let skinCollectionsData = [];
 const GRADE_MULTIPLIERS = {
   "High Grade": 1.25,
   Remarkable: 6.24,
@@ -2107,19 +2124,19 @@ const addCollectionKeychains = (collection) => {
   renderSelectedKeychains([...selectedKeychainMap.values()]);
 };
 
-stickerSearchInput.addEventListener("input", updateStickerSuggestions);
-collectionSearchInput.addEventListener("input", updateCollectionSuggestions);
-keychainSearchInput.addEventListener("input", updateKeychainSuggestions);
-keychainCollectionSearchInput.addEventListener(
+stickerSearchInput?.addEventListener("input", updateStickerSuggestions);
+collectionSearchInput?.addEventListener("input", updateCollectionSuggestions);
+keychainSearchInput?.addEventListener("input", updateKeychainSuggestions);
+keychainCollectionSearchInput?.addEventListener(
   "input",
   updateKeychainCollectionSuggestions
 );
-clearStickersButton.addEventListener("click", () => {
+clearStickersButton?.addEventListener("click", () => {
   selectedStickerMap.clear();
   selectedStickerCollection = null;
   renderSelectedStickers([]);
 });
-clearKeychainsButton.addEventListener("click", () => {
+clearKeychainsButton?.addEventListener("click", () => {
   selectedKeychainMap.clear();
   selectedKeychainCollection = null;
   renderSelectedKeychains([]);
@@ -2253,6 +2270,68 @@ const loadKeychainData = async () => {
   }
 };
 
+const normalizeCollectionIdForUrl = (collectionId) =>
+  collectionId.replace(/^collection-/, "").replace(/-/g, "_");
+
+const buildCollectionUrl = (collectionId) => {
+  const minValue = parseFloat(minRange.value);
+  const maxValue = parseFloat(maxRange.value);
+  const url = new URL("https://csfloat.com/db");
+  url.searchParams.set("min", formatFloat(minValue));
+  url.searchParams.set("max", formatFloat(maxValue));
+  url.searchParams.set("collection", normalizeCollectionIdForUrl(collectionId));
+  return url.toString();
+};
+
+const renderCollectionOptions = () => {
+  if (!collectionSelect) {
+    return;
+  }
+  collectionSelect.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = t("skinsCollectionSelectPlaceholder");
+  collectionSelect.appendChild(placeholder);
+
+  skinCollectionsData.forEach((collection) => {
+    const option = document.createElement("option");
+    option.value = collection.id;
+    option.textContent = collection.name;
+    collectionSelect.appendChild(option);
+  });
+};
+
+const loadSkinsData = async () => {
+  try {
+    const buildUrl = (name) =>
+      typeof chrome !== "undefined" && chrome.runtime?.getURL
+        ? chrome.runtime.getURL(name)
+        : name;
+    const response = await fetch(buildUrl("skins.json"));
+    const data = await response.json();
+    skinsData = Array.isArray(data) ? data : [];
+    const collectionMap = new Map();
+    skinsData.forEach((skin) => {
+      (skin.collections || []).forEach((collection) => {
+        if (collection?.id && collection?.name && !collectionMap.has(collection.id)) {
+          collectionMap.set(collection.id, {
+            id: collection.id,
+            name: collection.name
+          });
+        }
+      });
+    });
+    skinCollectionsData = Array.from(collectionMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+  } catch (error) {
+    skinsData = [];
+    skinCollectionsData = [];
+  } finally {
+    renderCollectionOptions();
+  }
+};
+
 if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.action !== "rateLimitUpdate") {
@@ -2281,162 +2360,72 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
 }
 
 runBtn.addEventListener("click", () => {
-  const selectedItems = [
-    ...[...selectedStickerMap.values()].map((sticker) => ({
-      type: "sticker",
-      data: sticker
-    })),
-    ...[...selectedKeychainMap.values()].map((keychain) => ({
-      type: "keychain",
-      data: keychain
-    }))
-  ];
-  if (selectedItems.length === 0) {
+  const selectedCollectionId = collectionSelect?.value || "";
+  if (!selectedCollectionId) {
     alert(t("alertSelect"));
     return;
   }
 
+  const selectedCollection = skinCollectionsData.find(
+    (collection) => collection.id === selectedCollectionId
+  );
+  if (!selectedCollection) {
+    alert(t("alertSelect"));
+    return;
+  }
+
+  const url = buildCollectionUrl(selectedCollection.id);
+
   resultsList.innerHTML = "";
   summaryList.innerHTML = "";
-  generatedLink.href = "#";
-  generatedLink.textContent = "—";
+  generatedLink.href = url;
+  generatedLink.textContent = url;
   summaryItems = [];
-  isDownloadingAllImages = false;
-  isDownloadingCollage = false;
-  isDownloadingHorizontalCollage = false;
-  progressTotal = selectedItems.length;
-  estimatedLinksTotal = countTotalLinks(selectedItems);
+  progressTotal = 1;
+  estimatedLinksTotal = 1;
   updateProgressEstimate(estimatedLinksTotal);
   updateProgress(0, progressTotal);
-  downloadCsvButton.disabled = true;
-  if (downloadImagesButton) {
-    downloadImagesButton.disabled = true;
-  }
-  if (downloadCollageButton) {
-    downloadCollageButton.disabled = true;
-  }
-  if (downloadCollageHorizontalButton) {
-    downloadCollageHorizontalButton.disabled = true;
-  }
   runBtn.disabled = true;
   stopBtn.disabled = false;
+
+  const block = document.createElement("div");
+  block.className = "sticker-block";
+  const title = document.createElement("h3");
+  title.textContent = selectedCollection.name;
+  const resultLine = document.createElement("div");
+  resultLine.className = "result-meta";
+  resultLine.textContent = t("waiting");
+  block.append(title, resultLine);
+  resultsList.appendChild(block);
+
   const stopRequestedRef = { stopRequested: false };
   activeRunId = nextRunId();
   stopBtn.onclick = async () => {
     stopRequestedRef.stopRequested = true;
     stopBtn.disabled = true;
-    setPauseState({ paused: false });
     if (activeRunId) {
       await stopCounts(activeRunId);
     }
   };
-  let processed = 0;
-  const runSequential = async () => {
-    for (const entry of selectedItems) {
+
+  requestCounts([url], activeRunId)
+    .then((response) => {
       if (stopRequestedRef.stopRequested) {
-        break;
+        return;
       }
-      await waitForResumeIfPaused();
-      if (stopRequestedRef.stopRequested) {
-        break;
-      }
-
-      if (entry.type === "sticker") {
-        const sticker = entry.data;
-        const urls = [1, 2, 3, 4, 5].map((count) => ({
-          count,
-          url: buildStickerUrl(sticker.def_index, count)
-        }));
-
-        if (generatedLink.textContent === "—") {
-          generatedLink.href = urls[0].url;
-          generatedLink.textContent = urls[0].url;
-        }
-
-        renderStickerResults(
-          sticker,
-          urls.map((item) => ({ ...item, found: null, loading: true }))
-        );
-
-        const response = stopRequestedRef.stopRequested
-          ? null
-          : await requestCounts(
-              urls.map((u) => u.url),
-              activeRunId
-            );
-
-        if (!response?.results) {
-          renderStickerResults(
-            sticker,
-            urls.map((item) => ({ ...item, found: null, loading: false }))
-          );
-          processed += 1;
-          updateProgress(processed, progressTotal);
-          continue;
-        }
-
-        const results = response.results.map((result, index) => ({
-          count: index + 1,
-          url: result.url,
-          found: result.count,
-          loading: false
-        }));
-        renderStickerResults(sticker, results);
-
-        const summaryItem = createStickerSummaryItem(sticker, results);
-        if (summaryItem) {
-          summaryItems.push(summaryItem);
-        }
-      } else {
-        const keychain = entry.data;
-        const url = buildKeychainUrl(keychain.def_index);
-
-        if (generatedLink.textContent === "—") {
-          generatedLink.href = url;
-          generatedLink.textContent = url;
-        }
-
-        renderKeychainResults(keychain, { url, found: null, loading: true });
-
-        const response = stopRequestedRef.stopRequested
-          ? null
-          : await requestCounts([url], activeRunId);
-
-        if (!response?.results?.length) {
-          renderKeychainResults(keychain, { url, found: null, loading: false });
-          processed += 1;
-          updateProgress(processed, progressTotal);
-          continue;
-        }
-
-        const result = {
-          url: response.results[0].url,
-          found: response.results[0].count,
-          loading: false
-        };
-        renderKeychainResults(keychain, result);
-
-        const summaryItem = createKeychainSummaryItem(keychain, result);
-        if (summaryItem) {
-          summaryItems.push(summaryItem);
-        }
-      }
-
-      processed += 1;
-      updateProgress(processed, progressTotal);
-    }
-
-    if (!stopRequestedRef.stopRequested && retryFailedCheckbox?.checked) {
-      await retryFailedItems(selectedItems, stopRequestedRef);
-    }
-  };
-
-  runSequential().finally(() => {
-    runBtn.disabled = false;
-    stopBtn.disabled = true;
-    activeRunId = null;
-    refreshSummaryDisplay();
-  });
+      const countValue = response?.results?.[0]?.count ?? t("notFound");
+      resultLine.textContent = `${t("resultsLabel")} ${countValue}`;
+      updateProgress(1, 1);
+    })
+    .catch(() => {
+      resultLine.textContent = t("notFound");
+      updateProgress(1, 1);
+    })
+    .finally(() => {
+      runBtn.disabled = false;
+      stopBtn.disabled = true;
+      activeRunId = null;
+    });
 });
 
 moduleSwitchButtons.forEach((button) => {
@@ -2447,8 +2436,7 @@ moduleSwitchButtons.forEach((button) => {
 
 syncInputs(0, 1);
 initCardToggles();
-loadStickerData();
-loadKeychainData();
+loadSkinsData();
 currentTheme = localStorage.getItem("csfloat-theme") || getPreferredTheme();
 setTheme(currentTheme);
 applyTranslations();

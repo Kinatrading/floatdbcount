@@ -132,103 +132,19 @@
         </div>
       </section>
 
-      <section class="card">
-        <h2><span data-i18n="stickersTitle">Наліпки</span></h2>
-        <div class="card-content">
-          <div class="rarity-filter">
-            <span data-i18n="gradeLabel">Грейд:</span>
-            <div
-              class="checkbox-grid"
-              role="group"
-              aria-label="Грейд наліпок"
-              data-i18n-aria="gradeAria"
-            >
-              <label class="checkbox">
-                <input type="checkbox" name="rarity" value="all" checked />
-                <span data-i18n="gradeAll">Усі</span>
-              </label>
-              <label class="checkbox">
-                <input type="checkbox" name="rarity" value="High Grade" />
-                <span>High Grade</span>
-              </label>
-              <label class="checkbox">
-                <input type="checkbox" name="rarity" value="Remarkable" />
-                <span>Remarkable</span>
-              </label>
-              <label class="checkbox">
-                <input type="checkbox" name="rarity" value="Exotic" />
-                <span>Exotic</span>
-              </label>
-              <label class="checkbox">
-                <input type="checkbox" name="rarity" value="Extraordinary" />
-                <span>Extraordinary</span>
-              </label>
-            </div>
-          </div>
-          <label class="full-width">
-            <span data-i18n="stickerSearch">Пошук наліпки</span>
-            <input
-              type="text"
-              id="sticker-search"
-              placeholder="Sticker | Fearsome"
-              autocomplete="off"
-              data-i18n-placeholder="stickerSearchPlaceholder"
-            />
-          </label>
-          <ul id="sticker-suggestions" class="suggestions"></ul>
-          <label class="full-width">
-            <span data-i18n="collectionSearch">Пошук колекції</span>
-            <input
-              type="text"
-              id="collection-search"
-              placeholder="Sticker Capsule"
-              autocomplete="off"
-              data-i18n-placeholder="collectionSearchPlaceholder"
-            />
-          </label>
-          <ul id="collection-suggestions" class="suggestions"></ul>
-          <div class="selected-block">
-            <span data-i18n="selectedStickers">Обрані наліпки:</span>
-            <button type="button" id="clear-stickers" class="secondary-button">
-              <span data-i18n="clearAll">Видалити всі</span>
-            </button>
-            <ul id="selected-stickers" class="selected-list"></ul>
-          </div>
-        </div>
-      </section>
+      
+
+      
 
       <section class="card">
-        <h2><span data-i18n="keychainsTitle">Брелки</span></h2>
+        <h2><span data-i18n="skinsCollectionTitle">Колекція</span></h2>
         <div class="card-content">
           <label class="full-width">
-            <span data-i18n="keychainSearch">Пошук брелка</span>
-            <input
-              type="text"
-              id="keychain-search"
-              placeholder="Charm | Lil' Ava"
-              autocomplete="off"
-              data-i18n-placeholder="keychainSearchPlaceholder"
-            />
+            <span data-i18n="skinsCollectionSelectLabel">Оберіть колекцію</span>
+            <select id="collection-select" data-i18n-aria="skinsCollectionSelectAria" aria-label="Оберіть колекцію">
+              <option value="" data-i18n="skinsCollectionSelectPlaceholder">Спочатку завантажте skins.json</option>
+            </select>
           </label>
-          <ul id="keychain-suggestions" class="suggestions"></ul>
-          <label class="full-width">
-            <span data-i18n="keychainCollectionSearch">Пошук колекції</span>
-            <input
-              type="text"
-              id="keychain-collection-search"
-              placeholder="Missing Link Charm Collection"
-              autocomplete="off"
-              data-i18n-placeholder="keychainCollectionSearchPlaceholder"
-            />
-          </label>
-          <ul id="keychain-collection-suggestions" class="suggestions"></ul>
-          <div class="selected-block">
-            <span data-i18n="selectedKeychains">Обрані брелки:</span>
-            <button type="button" id="clear-keychains" class="secondary-button">
-              <span data-i18n="clearAll">Видалити всі</span>
-            </button>
-            <ul id="selected-keychains" class="selected-list"></ul>
-          </div>
         </div>
       </section>
 
