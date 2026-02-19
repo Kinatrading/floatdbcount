@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSFloat DB Sticker Linker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <div class="header-row">
+          <div>
+            <h1 data-i18n="title">CSFloat DB Sticker Linker created by Kina</h1>
+            <p data-i18n="subtitle">
+              Згенеруйте посилання для пошуку скінів по наліпках та float.
+            </p>
+          </div>
+          <div class="header-actions">
+            <label class="lang-select">
+              <span data-i18n="language">Мова</span>
+              <select id="language-select">
+                <option value="uk">Українська</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <div class="theme-select">
+              <span data-i18n="themeLabel">Тема</span>
+              <button id="theme-toggle" class="secondary-button" type="button">Темна тема</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="card">
+        <h2><span data-i18n="categoryTitle">Категорія предметів</span></h2>
+        <div class="card-content">
+          <div
+            class="checkbox-grid"
+            role="group"
+            aria-label="Категорія"
+            data-i18n-aria="categoryAria"
+          >
+            <label class="checkbox">
+              <input type="checkbox" name="category" value="all" checked />
+              <span data-i18n="categoryAll">Усі</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="category" value="1" />
+              <span>Normal</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="category" value="2" />
+              <span>StatTrak</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="category" value="3" />
+              <span>Souvenir</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span data-i18n="floatTitle">Діапазон float</span></h2>
+        <div class="card-content">
+          <div class="range-wrapper">
+            <div class="range-values">
+              <span id="min-display">0.000000</span>
+              <span id="max-display">1.000000</span>
+            </div>
+            <div class="range-controls">
+              <input
+                type="range"
+                id="min-range"
+                min="0"
+                max="1"
+                step="0.000001"
+                value="0"
+                aria-label="Мінімальний float"
+                data-i18n-aria="minFloatAria"
+              />
+              <input
+                type="range"
+                id="max-range"
+                min="0"
+                max="1"
+                step="0.000001"
+                value="1"
+                aria-label="Максимальний float"
+                data-i18n-aria="maxFloatAria"
+              />
+            </div>
+          </div>
+          <div class="number-inputs">
+            <label>
+              <span data-i18n="minLabel">Мінімум</span>
+              <input type="number" id="min-input" step="0.000001" min="0" max="1" value="0" />
+            </label>
+            <label>
+              <span data-i18n="maxLabel">Максимум</span>
+              <input type="number" id="max-input" step="0.000001" min="0" max="1" value="1" />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span data-i18n="stickersTitle">Наліпки</span></h2>
+        <div class="card-content">
+          <div class="rarity-filter">
+            <span data-i18n="gradeLabel">Грейд:</span>
+            <div
+              class="checkbox-grid"
+              role="group"
+              aria-label="Грейд наліпок"
+              data-i18n-aria="gradeAria"
+            >
+              <label class="checkbox">
+                <input type="checkbox" name="rarity" value="all" checked />
+                <span data-i18n="gradeAll">Усі</span>
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" name="rarity" value="High Grade" />
+                <span>High Grade</span>
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" name="rarity" value="Remarkable" />
+                <span>Remarkable</span>
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" name="rarity" value="Exotic" />
+                <span>Exotic</span>
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" name="rarity" value="Extraordinary" />
+                <span>Extraordinary</span>
+              </label>
+            </div>
+          </div>
+          <label class="full-width">
+            <span data-i18n="stickerSearch">Пошук наліпки</span>
+            <input
+              type="text"
+              id="sticker-search"
+              placeholder="Sticker | Fearsome"
+              autocomplete="off"
+              data-i18n-placeholder="stickerSearchPlaceholder"
+            />
+          </label>
+          <ul id="sticker-suggestions" class="suggestions"></ul>
+          <label class="full-width">
+            <span data-i18n="collectionSearch">Пошук колекції</span>
+            <input
+              type="text"
+              id="collection-search"
+              placeholder="Sticker Capsule"
+              autocomplete="off"
+              data-i18n-placeholder="collectionSearchPlaceholder"
+            />
+          </label>
+          <ul id="collection-suggestions" class="suggestions"></ul>
+          <div class="selected-block">
+            <span data-i18n="selectedStickers">Обрані наліпки:</span>
+            <button type="button" id="clear-stickers" class="secondary-button">
+              <span data-i18n="clearAll">Видалити всі</span>
+            </button>
+            <ul id="selected-stickers" class="selected-list"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span data-i18n="keychainsTitle">Брелки</span></h2>
+        <div class="card-content">
+          <label class="full-width">
+            <span data-i18n="keychainSearch">Пошук брелка</span>
+            <input
+              type="text"
+              id="keychain-search"
+              placeholder="Charm | Lil' Ava"
+              autocomplete="off"
+              data-i18n-placeholder="keychainSearchPlaceholder"
+            />
+          </label>
+          <ul id="keychain-suggestions" class="suggestions"></ul>
+          <label class="full-width">
+            <span data-i18n="keychainCollectionSearch">Пошук колекції</span>
+            <input
+              type="text"
+              id="keychain-collection-search"
+              placeholder="Missing Link Charm Collection"
+              autocomplete="off"
+              data-i18n-placeholder="keychainCollectionSearchPlaceholder"
+            />
+          </label>
+          <ul id="keychain-collection-suggestions" class="suggestions"></ul>
+          <div class="selected-block">
+            <span data-i18n="selectedKeychains">Обрані брелки:</span>
+            <button type="button" id="clear-keychains" class="secondary-button">
+              <span data-i18n="clearAll">Видалити всі</span>
+            </button>
+            <ul id="selected-keychains" class="selected-list"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="card actions">
+        <h2><span data-i18n="resultsTitle">Результати</span></h2>
+        <div class="card-content">
+          <div class="action-buttons">
+            <button id="run-btn" data-i18n="run">Run</button>
+            <button id="stop-btn" class="secondary-button" type="button" disabled>
+              <span data-i18n="stop">Stop</span>
+            </button>
+          </div>
+          <div class="output">
+            <span data-i18n="progressLabel">Прогрес обробки:</span>
+            <div class="progress">
+              <div
+                class="progress-bar"
+                id="progress-bar"
+                role="progressbar"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="0"
+              ></div>
+            </div>
+            <div class="progress-meta" id="progress-meta">0 / 0</div>
+            <div class="progress-meta">
+              <span data-i18n="estimatedTimeLabel">Очікуваний час:</span>
+              <span id="progress-estimate">—</span>
+            </div>
+            <div class="rate-limit" id="rate-limit">—</div>
+            <div class="rate-limit" id="rate-limit-global">—</div>
+          </div>
+          <div class="output">
+            <span data-i18n="runSettingsLabel">Налаштування запуску:</span>
+            <div
+              class="checkbox-grid"
+              role="group"
+              aria-label="Налаштування запуску"
+              data-i18n-aria="runSettingsAria"
+            >
+              <label class="checkbox">
+                <input type="checkbox" id="retry-failed" />
+                <span data-i18n="retryFailedLabel">
+                  Повторно перевіряти биті посилання після завершення
+                </span>
+              </label>
+            </div>
+          </div>
+          <div class="output">
+            <span data-i18n="generatedLink">Згенероване посилання:</span>
+            <a id="generated-link" href="#" target="_blank" rel="noreferrer">—</a>
+          </div>
+          <div class="output">
+            <span data-i18n="resultsLabel">Посилання та кількість:</span>
+            <div id="results-list" class="results-list"></div>
+          </div>
+          <div class="output">
+            <span data-i18n="summaryLabel">Збережений підсумок:</span>
+            <div class="summary-settings">
+              <span data-i18n="summarySettingsLabel">Налаштування підсумку:</span>
+              <div
+                class="checkbox-grid summary-settings-grid"
+                role="group"
+                aria-label="Налаштування підсумку"
+                data-i18n-aria="summarySettingsAria"
+              >
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-image" checked />
+                  <span data-i18n="summaryShowImage">Показувати картинку</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-title" checked />
+                  <span data-i18n="summaryShowTitle">Показувати назву</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-counts" checked />
+                  <span data-i18n="summaryShowCounts">Показувати кількість</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-total" checked />
+                  <span data-i18n="summaryShowTotal">Показувати суму</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-average" checked />
+                  <span data-i18n="summaryShowAverage">Показувати середнє</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-estimate" checked />
+                  <span data-i18n="summaryShowEstimate">Показувати оцінку відкриттів</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-hidden-estimate" checked />
+                  <span data-i18n="summaryShowHiddenEstimate">Показувати приховану оцінку</span>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" id="summary-show-date" checked />
+                  <span data-i18n="summaryShowDate">Показувати дату</span>
+                </label>
+              </div>
+            </div>
+            <button id="download-csv" class="secondary-button" type="button" disabled>
+              <span data-i18n="downloadCsv">Завантажити CSV</span>
+            </button>
+            <button id="download-images" class="secondary-button" type="button" disabled>
+              <span data-i18n="downloadImages">Завантажити всі картинки</span>
+            </button>
+            <button id="download-collage" class="secondary-button" type="button" disabled>
+              <span data-i18n="downloadCollage">Завантажити однією картинкою</span>
+            </button>
+            <button
+              id="download-collage-horizontal"
+              class="secondary-button"
+              type="button"
+              disabled
+            >
+              <span data-i18n="downloadCollageHorizontal">
+                Завантажити однією картинкою "горизонтально"
+              </span>
+            </button>
+            <div id="summary-list" class="summary-list"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="script.js"></script>
+  </body>
+</html>
