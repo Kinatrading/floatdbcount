@@ -1,0 +1,22 @@
+[
+  {
+    "id": "skin-0a4d4f4de128",
+    "name": "SG 553 | Gator Mesh",
+    "collections": [
+      {
+        "id": "collection-set-mirage",
+        "name": "The Mirage Collection"
+      }
+    ]
+  },
+  {
+    "id": "skin-example-2",
+    "name": "P90 | Sand Spray",
+    "collections": [
+      {
+        "id": "collection-set-dust-2",
+        "name": "The Dust 2 Collection"
+      }
+    ]
+  }
+]
